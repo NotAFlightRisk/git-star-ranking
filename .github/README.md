@@ -63,7 +63,7 @@ It's one Cloudflare Worker: a SvelteKit site, plus a cron, a queue consumer and 
 
 ### Option 1: Cloudflare Workers
 
-This is how the live site runs, and it needs Workers Paid for the queue. You'll also need a GitHub App of your own, with no permissions at all, the callback URL set to `https://<your domain>/auth/callback`, installed on your own account. Fork the repo, then:
+This is how the live site runs, and it's sized to fit inside Workers Paid. You'll also need a GitHub App of your own, with no permissions at all, the callback URL set to `https://<your domain>/auth/callback`, installed on your own account. Fork the repo, then:
 
 ```bash
 npm install
@@ -79,7 +79,7 @@ npx wrangler secret put GITHUB_PRIVATE_KEY
 npm run deploy
 ```
 
-The first sweep starts on the next cron, and the tables start filling within the hour.
+The first sweep starts on the next cron, and the tables start filling an hour or so later.
 
 ### Option 2: From a release or from source
 
