@@ -1,0 +1,43 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "git-star-ranking",
+  "main": ".svelte-kit/cloudflare/_worker.js",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": { "directory": ".svelte-kit/cloudflare", "binding": "ASSETS" },
+  "observability": { "enabled": true },
+  "workers_dev": false,
+  "preview_urls": false,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "git-star-ranking",
+      "database_id": "f6747478-afa6-4389-935d-a8dc0a4a7ae3",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "queues": {
+    "producers": [{ "binding": "CRAWL", "queue": "git-star-ranking-crawl" }],
+    "consumers": [
+      {
+        "queue": "git-star-ranking-crawl",
+        "max_batch_size": 1,
+        "max_concurrency": 1,
+        "max_retries": 20
+      }
+    ]
+  },
+  "durable_objects": { "bindings": [{ "name": "POOL", "class_name": "TokenPool" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TokenPool"] }],
+  "triggers": { "crons": ["*/10 * * * *", "17 */6 * * *"] },
+  "vars": {
+    "APP_URL": "https://git-star-ranking.peng.ly",
+    "ADMINS": "NotAFlightRisk",
+    "REPO_MIN_STARS": "50",
+    "REFRESH_TIERS": "1000:1,100:7,0:30",
+    "SWEEP_DAYS": "7",
+    "OWNER_REPO_PAGES": "10",
+    "STREAMS": "2"
+  },
+  "routes": [{ "pattern": "git-star-ranking.peng.ly", "custom_domain": true }]
+}

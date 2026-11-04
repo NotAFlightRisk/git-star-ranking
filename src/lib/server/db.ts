@@ -1,0 +1,239 @@
+import { env } from 'cloudflare:workers';
+import { DAY, refreshDays, settings } from './config.ts';
+import type { Found, Kind, Owner } from './github.ts';
+import { meterD1 } from './usage.ts';
+
+export interface OwnerRow {
+  id: number;
+  login: string;
+  kind: Kind;
+  stars: number;
+  repos: number;
+  refreshed_at: number;
+  due_at: number;
+}
+
+export interface RepoRow {
+  id: number;
+  owner_id: number;
+  name: string;
+  stars: number;
+  language: string | null;
+  description: string | null;
+}
+
+export const seconds = () => Math.floor(Date.now() / 1000);
+
+const each = (column: number) => `json_extract(value, '$[${column}]')`;
+
+const UPSERT_REPOS = `
+  INSERT INTO repos (id, owner_id, name, stars, language, description)
+  SELECT ${[0, 1, 2, 3, 4, 5].map(each).join(', ')} FROM json_each(?1)
+  WHERE NOT EXISTS (SELECT 1 FROM owners WHERE id = ${each(1)} AND hidden = 1)
+  ON CONFLICT (id) DO UPDATE SET owner_id = excluded.owner_id, name = excluded.name,
+    stars = excluded.stars, language = excluded.language, description = excluded.description
+  WHERE repos.stars <> excluded.stars OR repos.owner_id <> excluded.owner_id
+    OR repos.name <> excluded.name COLLATE BINARY OR repos.language IS NOT excluded.language
+    OR repos.description IS NOT excluded.description`;
+
+const UPSERT_OWNERS = `
+  INSERT INTO owners (id, login, kind, stars, repos, refreshed_at, due_at)
+  SELECT ${[0, 1, 2, 3, 4].map(each).join(', ')}, ?2, ${each(5)} FROM json_each(?1) WHERE true
+  ON CONFLICT (id) DO UPDATE SET login = excluded.login, kind = excluded.kind,
+    stars = excluded.stars, repos = excluded.repos, refreshed_at = excluded.refreshed_at,
+    due_at = excluded.due_at
+  WHERE owners.hidden = 0`;
+
+// a stub waits on its first refresh, biggest first, as due_at sorts below everyone else
+const STUB_OWNERS = `
+  INSERT INTO owners (id, login, kind, stars, due_at)
+  SELECT ${[0, 1, 2, 3].map(each).join(', ')}, -${each(3)} FROM json_each(?1) WHERE true
+  ON CONFLICT (id) DO UPDATE SET login = excluded.login
+  WHERE owners.hidden = 0 AND owners.login <> excluded.login COLLATE BINARY`;
+
+const PRUNE_REPOS = `
+  DELETE FROM repos WHERE owner_id IN (SELECT value FROM json_each(?1))
+  AND id NOT IN (SELECT value FROM json_each(?2))`;
+
+const DROP_OWNERS = `
+  DELETE FROM owners WHERE id IN (SELECT value FROM json_each(?1))`;
+
+const DROP_THEIR_REPOS = `
+  DELETE FROM repos WHERE owner_id IN (SELECT value FROM json_each(?1))`;
+
+const sql = (text: string, ...values: unknown[]) => env.DB.prepare(text).bind(...values);
+
+const jitter = () => 0.9 + Math.random() * 0.2;
+
+/** Writes what a refresh found, touching only rows that changed */
+export async function saveOwners(fetched: Owner[], gone: number[] = []) {
+  const { minStars, tiers } = settings();
+  const now = seconds();
+  const owners = fetched.map((owner) => {
+    const stars = owner.list.reduce((sum, repo) => sum + repo.stars, 0);
+    const due = now + Math.round(refreshDays(stars, tiers) * DAY * jitter());
+    return [owner.id, owner.login, owner.kind, stars, owner.repos, due];
+  });
+  const repos = fetched.flatMap((owner) =>
+    owner.list
+      .filter((repo) => repo.stars >= minStars)
+      .map((repo) => [repo.id, owner.id, repo.name, repo.stars, repo.language, repo.description])
+  );
+  const complete = fetched.filter((owner) => !owner.cursor).map((owner) => owner.id);
+  const statements = [
+    sql(UPSERT_OWNERS, JSON.stringify(owners), now),
+    sql(UPSERT_REPOS, JSON.stringify(repos)),
+    sql(PRUNE_REPOS, JSON.stringify(complete), JSON.stringify(repos.map(([id]) => id)))
+  ];
+  if (gone.length) {
+    const ids = JSON.stringify(gone);
+    statements.push(sql(DROP_THEIR_REPOS, ids), sql(DROP_OWNERS, ids));
+  }
+  meterD1(await env.DB.batch(statements));
+}
+
+/** Search results: repos as they stand, plus a stub for any owner we've not met */
+export async function saveFound(found: Found[]) {
+  const owners = new Map<number, [number, string, Kind, number]>();
+  for (const { owner, stars } of found) {
+    const row = owners.get(owner.id) ?? [owner.id, owner.login, owner.kind, 0];
+    row[3] += stars;
+    owners.set(owner.id, row);
+  }
+  const repos = found.map((repo) => [
+    repo.id,
+    repo.owner.id,
+    repo.name,
+    repo.stars,
+    repo.language,
+    repo.description
+  ]);
+  meterD1(
+    await env.DB.batch([
+      sql(STUB_OWNERS, JSON.stringify([...owners.values()])),
+      sql(UPSERT_REPOS, JSON.stringify(repos))
+    ])
+  );
+}
+
+export async function due(limit: number) {
+  const { results } = await env.DB.prepare(
+    `SELECT id, kind, login, repos, refreshed_at FROM owners
+     WHERE due_at <= ?1 AND hidden = 0 ORDER BY due_at LIMIT ?2`
+  )
+    .bind(seconds(), limit)
+    .all<Pick<OwnerRow, 'id' | 'kind' | 'login' | 'repos' | 'refreshed_at'>>();
+  return results;
+}
+
+/** Leaves an owner GitHub wouldn't give us for a day, so one bad account can't wedge the queue */
+export async function snooze(ids: number[]) {
+  meterD1(
+    await sql(
+      'UPDATE owners SET due_at = ?2 WHERE id IN (SELECT value FROM json_each(?1))',
+      JSON.stringify(ids),
+      seconds() + DAY
+    ).run()
+  );
+}
+
+export async function readState<T>(key: string) {
+  const row = await sql('SELECT value FROM state WHERE key = ?', key).first<{ value: string }>();
+  return row ? (JSON.parse(row.value) as T) : undefined;
+}
+
+export async function writeState(key: string, value: unknown) {
+  meterD1(
+    await sql(
+      'INSERT INTO state (key, value) VALUES (?1, ?2) ON CONFLICT (key) DO UPDATE SET value = ?2',
+      key,
+      JSON.stringify(value)
+    ).run()
+  );
+}
+
+/** Pushes an owner to the front of the refresh queue, once per refresh */
+export async function hurry(owner: OwnerRow, after = DAY) {
+  if (owner.due_at <= 0 || seconds() - owner.refreshed_at < after) return false;
+  meterD1(
+    await env.DB.prepare('UPDATE owners SET due_at = 0 WHERE id = ? AND due_at > 0')
+      .bind(owner.id)
+      .run()
+  );
+  return true;
+}
+
+export const findOwner = (login: string) =>
+  env.DB.prepare(
+    `SELECT id, login, kind, stars, repos, refreshed_at, due_at FROM owners
+     WHERE login = ? AND hidden = 0 ORDER BY refreshed_at DESC LIMIT 1`
+  )
+    .bind(login)
+    .first<OwnerRow>();
+
+export const ownerRepos = async (ownerId: number) =>
+  (
+    await env.DB.prepare(
+      `SELECT id, owner_id, name, stars, language, description FROM repos
+       WHERE owner_id = ? ORDER BY stars DESC, id LIMIT 100`
+    )
+      .bind(ownerId)
+      .all<RepoRow>()
+  ).results;
+
+export const findRepo = (ownerId: number, name: string) =>
+  env.DB.prepare(
+    `SELECT id, owner_id, name, stars, language, description FROM repos
+     WHERE owner_id = ? AND name = ? LIMIT 1`
+  )
+    .bind(ownerId, name)
+    .first<RepoRow>();
+
+/** Hides an account for good, and leaves a tombstone so a crawl can't bring it back */
+export async function forget(id: number) {
+  meterD1(
+    await env.DB.batch([
+      env.DB.prepare(
+        `UPDATE owners SET hidden = 1, login = '', stars = 0, repos = 0, due_at = 9e15 WHERE id = ?`
+      ).bind(id),
+      env.DB.prepare('DELETE FROM repos WHERE owner_id = ?').bind(id)
+    ])
+  );
+}
+
+/** A prefix as an index-friendly range, as LIKE won't always use one */
+export const range = (prefix: string) =>
+  prefix
+    ? [prefix, prefix.slice(0, -1) + String.fromCharCode(prefix.charCodeAt(prefix.length - 1) + 1)]
+    : ['', '￿'];
+
+export async function search(query: string) {
+  const scoped = query.includes('/');
+  const [login, name] = scoped ? query.split('/', 2) : [query, query];
+  const owners = sql(
+    `SELECT id, login, kind, stars FROM owners
+     WHERE login >= ?1 AND login < ?2 AND hidden = 0 AND refreshed_at > 0
+     ORDER BY stars DESC LIMIT 20`,
+    ...range(login)
+  );
+  const repos = scoped
+    ? sql(
+        `SELECT r.id, o.login, r.name, r.stars, r.language, r.description
+         FROM owners o JOIN repos r ON r.owner_id = o.id
+         WHERE o.login = ?1 AND o.hidden = 0 AND r.name >= ?2 AND r.name < ?3
+         ORDER BY r.stars DESC LIMIT 20`,
+        login,
+        ...range(name)
+      )
+    : sql(
+        `SELECT r.id, o.login, r.name, r.stars, r.language, r.description
+         FROM repos r JOIN owners o ON o.id = r.owner_id
+         WHERE r.name >= ?1 AND r.name < ?2 AND o.hidden = 0 ORDER BY r.stars DESC LIMIT 20`,
+        ...range(name)
+      );
+  const [found, matched] = meterD1(await env.DB.batch([owners, repos]));
+  return {
+    owners: found.results as Pick<OwnerRow, 'id' | 'login' | 'kind' | 'stars'>[],
+    repos: matched.results as (Omit<RepoRow, 'owner_id'> & { login: string })[]
+  };
+}

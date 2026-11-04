@@ -1,0 +1,34 @@
+CREATE TABLE owners (
+  id INTEGER PRIMARY KEY,
+  login TEXT NOT NULL COLLATE NOCASE,
+  kind INTEGER NOT NULL,
+  stars INTEGER NOT NULL DEFAULT 0,
+  repos INTEGER NOT NULL DEFAULT 0,
+  refreshed_at INTEGER NOT NULL DEFAULT 0,
+  due_at INTEGER NOT NULL DEFAULT 0,
+  hidden INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX owners_login ON owners (login);
+CREATE INDEX owners_due ON owners (due_at);
+
+CREATE TABLE repos (
+  id INTEGER PRIMARY KEY,
+  owner_id INTEGER NOT NULL,
+  name TEXT NOT NULL COLLATE NOCASE,
+  stars INTEGER NOT NULL,
+  language TEXT,
+  description TEXT
+);
+CREATE INDEX repos_owner ON repos (owner_id);
+CREATE INDEX repos_name ON repos (name);
+
+CREATE TABLE state (key TEXT PRIMARY KEY, value TEXT NOT NULL) WITHOUT ROWID;
+
+CREATE TABLE usage (
+  month TEXT NOT NULL,
+  metric TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  PRIMARY KEY (month, metric)
+) WITHOUT ROWID;
+
+CREATE TABLE blobs (key TEXT PRIMARY KEY, body TEXT NOT NULL) WITHOUT ROWID;

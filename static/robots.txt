@@ -1,0 +1,6 @@
+User-agent: *
+Disallow: /admin
+Disallow: /login
+Disallow: /auth/
+Disallow: /search
+Sitemap: https://git-star-ranking.peng.ly/sitemap.xml
