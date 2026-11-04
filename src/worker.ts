@@ -18,7 +18,8 @@ export default {
     try {
       if (controller.cron === SNAPSHOT) await snapshot();
       else {
-        if (await filling()) await snapshot();
+        // a snapshot that falls over shouldn't take the crawl down with it
+        if (await filling()) await snapshot().catch((error) => report(error, undefined, 'cron'));
         await maybeSweep();
         await refreshDue(Date.now() + WORK_MS);
       }

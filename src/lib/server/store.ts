@@ -2,22 +2,25 @@ import { env } from 'cloudflare:workers';
 import { one } from './db.ts';
 import { meter, meterD1 } from './usage.ts';
 
+const UPSERT =
+  'INSERT INTO blobs (key, body) VALUES (?1, ?2) ON CONFLICT (key) DO UPDATE SET body = ?2';
+
 /** Snapshots live in R2 when there's a bucket bound, and in a D1 table until then */
-export async function put(key: string, value: unknown) {
-  const body = JSON.stringify(value);
-  meter('blob_writes');
-  if (env.SNAPSHOTS) {
-    await env.SNAPSHOTS.put(key, body, { httpMetadata: { contentType: 'application/json' } });
+export async function putAll(entries: [string, unknown][]) {
+  if (!entries.length) return;
+  const { SNAPSHOTS } = env;
+  const bodies = entries.map(([key, value]) => [key, JSON.stringify(value)]);
+  meter('blob_writes', bodies.length);
+  if (SNAPSHOTS) {
+    const meta = { httpMetadata: { contentType: 'application/json' } };
+    await Promise.all(bodies.map(([key, body]) => SNAPSHOTS.put(key, body, meta)));
     return;
   }
-  meterD1(
-    await env.DB.prepare(
-      'INSERT INTO blobs (key, body) VALUES (?1, ?2) ON CONFLICT (key) DO UPDATE SET body = ?2'
-    )
-      .bind(key, body)
-      .run()
-  );
+  // D1 answers one request at a time, so the lot goes as one
+  meterD1(await env.DB.batch(bodies.map((pair) => env.DB.prepare(UPSERT).bind(...pair))));
 }
+
+export const put = (key: string, value: unknown) => putAll([[key, value]]);
 
 export async function get<T>(key: string): Promise<T | undefined> {
   meter('blob_reads');
