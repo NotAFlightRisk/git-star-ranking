@@ -92,11 +92,10 @@
 
       a {
         font-weight: 400;
-        color: var(--text-muted);
         text-decoration: none;
 
         &:hover {
-          color: var(--accent);
+          text-decoration: underline;
         }
       }
     }

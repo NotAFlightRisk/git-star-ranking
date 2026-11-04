@@ -23,13 +23,14 @@ export const top = (share: number) => {
   return `top ${Math.ceil(percent)}%`;
 };
 
-/** GitHub's :emoji: shortcodes only mean something on GitHub, and a cut lands on a whole word */
+/** GitHub's :emoji: shortcodes only mean something on GitHub, and a cut lands on a whole word.
+ * Anything already at the limit is treated as cut, as older rows were chopped at exactly 200 */
 export function tidy(text: string | null | undefined, most = 200) {
   const clean = (text ?? '')
     .replace(/:(?:[a-z][a-z0-9_+-]*|[+-]1):/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-  if (clean.length <= most) return clean || null;
+  if (clean.length < most) return clean || null;
   const cut = clean.slice(0, most - 3);
   const space = cut.lastIndexOf(' ');
   return `${space > most / 2 ? cut.slice(0, space) : cut}...`;

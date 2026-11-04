@@ -21,7 +21,7 @@
 
 <Seo
   title="git-star-ranking"
-  description="Unofficial GitHub star ranking for users, organizations and repositories. Find where any account or repo sits, updated every night."
+  description="Unofficial GitHub star ranking for users, organizations and repositories. Find where any account or repo sits, updated every six hours."
   path="/"
   {schema}
 />

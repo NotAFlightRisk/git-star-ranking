@@ -49,6 +49,12 @@ describe('short', () => {
     expect(cut.endsWith('word...')).toBe(true);
   });
 
+  it('re-cuts a row an older crawl chopped at exactly 200, mid-word', () => {
+    const chopped = `${'word '.repeat(39)}with`;
+    expect(chopped).toHaveLength(199);
+    expect(short(`${chopped}o`)).toBe(`${'word '.repeat(39).trim()}...`);
+  });
+
   it('still cuts a description with no spaces in it', () => {
     expect(short('x'.repeat(300))).toBe(`${'x'.repeat(197)}...`);
   });

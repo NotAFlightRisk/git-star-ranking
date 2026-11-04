@@ -46,7 +46,7 @@
     : ''}"
   description="GitHub {subject} ranked by stars, {first} to {first +
     data.rows.length -
-    1}{data.total ? ` of ${number(data.total)} ranked` : ''}. Updated every night."
+    1}{data.total ? ` of ${number(data.total)} ranked` : ''}. Updated every six hours."
   path={href(data.page)}
 />
 
@@ -141,6 +141,7 @@
       overflow-x: auto;
       padding-block-end: var(--space-1);
       scrollbar-width: thin;
+      mask-image: linear-gradient(to right, #000 80%, transparent);
 
       a {
         flex: none;

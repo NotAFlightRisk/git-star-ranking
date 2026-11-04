@@ -89,7 +89,7 @@ async function languageBoards() {
   );
 }
 
-/** The nightly bit: leaderboards, rank histograms and a day of history */
+/** Leaderboards, rank histograms and a day of history, every six hours */
 export async function snapshot() {
   const at = Date.now();
   const owners = (kind: number) =>
