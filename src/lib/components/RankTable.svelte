@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { avatar, number } from '#lib/format.ts';
+  import { avatar, number, tidy } from '#lib/format.ts';
   import Star from './Star.svelte';
 
   interface Row {
@@ -13,47 +13,65 @@
     description?: string | null;
   }
 
+  interface Props {
+    rows: Row[];
+    caption: string;
+    heading: string;
+    brief?: boolean;
+    owned?: boolean;
+    languages?: boolean;
+    me?: number;
+  }
+
   const {
     rows,
     caption,
     heading,
     brief = false,
-    owned = false
-  }: { rows: Row[]; caption: string; heading: string; brief?: boolean; owned?: boolean } = $props();
+    owned = false,
+    languages = true,
+    me
+  }: Props = $props();
   const repos = $derived(rows.some((row) => row.name));
+  const language = $derived(repos && languages && !brief);
 </script>
 
-<table class="ranks" class:brief>
+<table class="ranks" class:brief class:owned>
   <caption class="visually-hidden">{caption}</caption>
   <thead>
     <tr>
       <th scope="col" class="numeric">Rank</th>
       <th scope="col">{heading}</th>
-      {#if repos && !brief}<th scope="col" class="language">Language</th>{/if}
+      {#if language}<th scope="col" class="language">Language</th>{/if}
       <th scope="col" class="numeric">Stars</th>
     </tr>
   </thead>
   <tbody>
     {#each rows as row (row.id)}
-      <tr>
+      {@const mine = !row.name && row.id === me}
+      <tr class:mine aria-current={mine ? 'true' : undefined}>
         <td class="numeric rank">{number(row.rank)}</td>
         <td class="who">
           <div class="name">
-            <img
-              src={avatar(row.owner_id ?? row.id)}
-              alt=""
-              width="24"
-              height="24"
-              loading="lazy"
-            />
+            {#if !owned}
+              <img
+                src={avatar(row.owner_id ?? row.id)}
+                alt=""
+                width="24"
+                height="24"
+                loading="lazy"
+              />
+            {/if}
             <a href={row.name ? `/${row.login}/${row.name}` : `/${row.login}`}>
               {#if row.name && !owned}<span class="owner">{row.login}/</span><wbr
                 />{/if}{row.name ?? row.login}
             </a>
           </div>
-          {#if !brief && row.description}<p class="description">{row.description}</p>{/if}
+          {#if !brief && row.description}
+            <p class="description">{tidy(row.description)}</p>
+          {/if}
         </td>
-        {#if repos && !brief}<td class="language">{row.language ?? ''}</td>{/if}
+        {#if language}<td class="language">{row.language ?? ''}</td>{/if}
         <td class="numeric"><Star /> {number(row.stars)}</td>
       </tr>
     {/each}
@@ -68,11 +86,15 @@
   }
 
   th {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 1;
     padding: var(--space-2) var(--space-3);
     text-align: start;
     font-weight: 600;
     color: var(--text-muted);
-    border-block-end: 1px solid var(--border-strong);
+    background: var(--surface);
+    box-shadow: inset 0 -1px var(--border-strong);
     white-space: nowrap;
   }
 
@@ -94,6 +116,10 @@
     &:hover {
       background: var(--surface-hover);
     }
+
+    &.mine {
+      background: var(--accent-soft);
+    }
   }
 
   .rank {
@@ -103,13 +129,14 @@
 
   .name {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: var(--space-2);
     min-width: 0;
 
     img {
       width: var(--avatar);
       height: var(--avatar);
+      margin-block: -0.125rem;
       border-radius: 50%;
       flex: none;
       background: var(--surface-hover);
@@ -136,6 +163,10 @@
     margin-inline-start: calc(var(--avatar) + var(--space-2));
     color: var(--text-muted);
     max-width: var(--measure);
+  }
+
+  .owned .description {
+    margin-inline-start: 0;
   }
 
   .language {

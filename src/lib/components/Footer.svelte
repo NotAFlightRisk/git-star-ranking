@@ -1,6 +1,15 @@
+<script lang="ts">
+  import Updated from './Updated.svelte';
+
+  const { updated }: { updated?: number } = $props();
+</script>
+
 <footer class="site-footer">
   <div class="bar">
-    <p>Unofficial, and not affiliated with GitHub. Stars come from GitHub's public API.</p>
+    <div class="about">
+      <p>Unofficial, and not affiliated with GitHub. Stars come from GitHub's public API.</p>
+      <Updated at={updated} label="Rankings updated" />
+    </div>
     <nav aria-label="About this site">
       <a href="/about">How it works</a>
       <a href="/about#privacy">Privacy</a>
@@ -25,6 +34,11 @@
     flex-wrap: wrap;
     justify-content: space-between;
     gap: var(--space-3) var(--space-5);
+  }
+
+  .about {
+    display: grid;
+    gap: var(--space-1);
   }
 
   nav {

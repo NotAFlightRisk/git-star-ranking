@@ -36,7 +36,7 @@
         id="home-search"
         type="search"
         name="q"
-        placeholder="torvalds, or facebook/react"
+        placeholder="torvalds or react"
         autocomplete="off"
         spellcheck="false"
         required
@@ -58,7 +58,7 @@
           heading={board.noun}
           brief
         />
-        <a class="more" href={board.path}>Show more <span aria-hidden="true">&rarr;</span></a>
+        <a class="more" href={board.path}>Show more {board.label.toLowerCase()}</a>
       {:else}
         <p class="empty">The first crawl is still going, so check back in a few hours.</p>
       {/if}

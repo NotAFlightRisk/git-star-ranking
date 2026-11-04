@@ -23,6 +23,18 @@ export const top = (share: number) => {
   return `top ${Math.ceil(percent)}%`;
 };
 
+/** GitHub's :emoji: shortcodes only mean something on GitHub, and a cut lands on a whole word */
+export function tidy(text: string | null | undefined, most = 200) {
+  const clean = (text ?? '')
+    .replace(/:(?:[a-z][a-z0-9_+-]*|[+-]1):/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (clean.length <= most) return clean || null;
+  const cut = clean.slice(0, most - 3);
+  const space = cut.lastIndexOf(' ');
+  return `${space > most / 2 ? cut.slice(0, space) : cut}...`;
+}
+
 export const avatar = (id: number, size = 48) =>
   `https://avatars.githubusercontent.com/u/${id}?s=${size}&v=4`;
 

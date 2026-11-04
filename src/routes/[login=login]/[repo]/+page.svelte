@@ -2,7 +2,7 @@
   import Seo from '#lib/components/Seo.svelte';
   import Star from '#lib/components/Star.svelte';
   import Updated from '#lib/components/Updated.svelte';
-  import { avatar, number, top } from '#lib/format.ts';
+  import { avatar, number, tidy, top } from '#lib/format.ts';
 
   const { data } = $props();
   const { owner, repo } = $derived(data);
@@ -13,7 +13,7 @@
     name: repo.name,
     codeRepository: `https://github.com/${full}`,
     programmingLanguage: repo.language ?? undefined,
-    description: repo.description ?? undefined,
+    description: tidy(repo.description) ?? undefined,
     author: { '@type': owner.kind ? 'Organization' : 'Person', name: owner.login }
   });
 </script>
@@ -22,18 +22,17 @@
   title="{full} GitHub stars and rank"
   description="{full} has {number(repo.stars)} stars on GitHub{data.rank
     ? `, ranked #${number(data.rank.rank)} of ${number(data.rank.of)} repositories`
-    : ''}.{repo.description ? ` ${repo.description}` : ''}"
+    : ''}.{repo.description ? ` ${tidy(repo.description)}` : ''}"
   {schema}
 />
 
 <article class="repo">
   <header>
-    <p class="owner">
-      <img src={avatar(owner.id)} alt="" width="24" height="24" />
-      <a href="/{owner.login}">{owner.login}</a>
-    </p>
-    <h1>{repo.name}</h1>
-    {#if repo.description}<p class="description">{repo.description}</p>{/if}
+    <h1>
+      <img src={avatar(owner.id, 96)} alt="" width="40" height="40" />
+      <span><a href="/{owner.login}">{owner.login}</a>/<wbr />{repo.name}</span>
+    </h1>
+    {#if repo.description}<p class="description">{tidy(repo.description)}</p>{/if}
   </header>
 
   <dl class="stats">
@@ -55,7 +54,7 @@
     {#if repo.language}
       <div>
         <dt>Language</dt>
-        <dd>
+        <dd class="plain">
           <a href="/repositories?language={encodeURIComponent(repo.language.toLowerCase())}">
             {repo.language}
           </a>
@@ -79,19 +78,27 @@
     }
 
     h1 {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
       font-size: var(--text-2xl);
       letter-spacing: -0.02em;
-      overflow-wrap: anywhere;
-    }
-  }
+      overflow-wrap: break-word;
 
-  .owner {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
+      img {
+        flex: none;
+        border-radius: 50%;
+      }
 
-    img {
-      border-radius: 50%;
+      a {
+        font-weight: 400;
+        color: var(--text-muted);
+        text-decoration: none;
+
+        &:hover {
+          color: var(--accent);
+        }
+      }
     }
   }
 
@@ -119,6 +126,11 @@
       font-size: var(--text-xl);
       font-weight: 700;
       font-variant-numeric: tabular-nums;
+
+      &.plain {
+        font-size: var(--text-base);
+        font-weight: 400;
+      }
     }
   }
 

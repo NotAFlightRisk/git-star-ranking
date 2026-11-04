@@ -57,7 +57,7 @@ export async function boardLoad(board: Board, url: URL) {
 export async function standing(board: Board, stars: number) {
   const latest = await readMeta();
   const histogram = latest && (await cached<Histogram>(`hist/${board}`, latest.at));
-  if (!histogram || stars <= 0) return undefined;
+  if (!latest || !histogram?.total || stars <= 0) return undefined;
   return {
     rank: rankOf(histogram, stars),
     top: percentile(histogram, stars),

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { page } from '$app/state';
   import type { ComponentProps } from 'svelte';
   import { BOARDS, number } from '#lib/format.ts';
   import Pager from './Pager.svelte';
@@ -31,6 +32,12 @@
     return `${info.path}${params.size ? `?${params}` : ''}`;
   };
   const first = $derived((data.page - 1) * 50 + 1);
+
+  // on a phone the chips are one scrolling row, so start it on the one you're looking at
+  const centre = (nav: HTMLElement) => {
+    const current = nav.querySelector<HTMLElement>('[aria-current]');
+    if (current) nav.scrollLeft = current.offsetLeft - (nav.clientWidth - current.offsetWidth) / 2;
+  };
 </script>
 
 <Seo
@@ -53,7 +60,7 @@
 </header>
 
 {#if data.languages.length}
-  <nav class="languages" aria-label="Languages">
+  <nav class="languages" aria-label="Languages" {@attach centre}>
     <a href="/repositories" aria-current={data.language ? undefined : 'page'}>All</a>
     {#each data.languages as language (language.slug)}
       <a
@@ -65,11 +72,15 @@
 {/if}
 
 {#if data.rows.length}
-  <RankTable
-    rows={data.rows}
-    caption="{subject} ranked by stars, page {data.page} of {data.pages}"
-    heading={info.noun}
-  />
+  <div class="board" class:owners={data.board !== 'repositories'}>
+    <RankTable
+      rows={data.rows}
+      caption="{subject} ranked by stars, page {data.page} of {data.pages}"
+      heading={info.noun}
+      languages={!data.language}
+      me={page.data.user?.id}
+    />
+  </div>
   <Pager page={data.page} pages={data.pages} {href} />
 {:else}
   <p class="empty">Nothing ranked here yet. The first crawl is still going.</p>
@@ -116,7 +127,24 @@
     }
   }
 
+  .board.owners {
+    max-width: 44rem;
+  }
+
   .empty {
     color: var(--text-muted);
+  }
+
+  @media (max-width: 40rem) {
+    .languages {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      padding-block-end: var(--space-1);
+      scrollbar-width: thin;
+
+      a {
+        flex: none;
+      }
+    }
   }
 </style>

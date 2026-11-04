@@ -33,10 +33,23 @@ describe('nodeId past 32 bits', () => {
 });
 
 describe('short', () => {
-  it('flattens whitespace and trims long descriptions', () => {
+  it('flattens whitespace and drops GitHub emoji shortcodes', () => {
     expect(short('  a\n\tb  ')).toBe('a b');
-    expect(short('x'.repeat(300))).toHaveLength(200);
+    expect(short(':zap: Fast :+1: things')).toBe('Fast things');
+    expect(short('Runs at 10:30:45 sharp')).toBe('Runs at 10:30:45 sharp');
     expect(short('   ')).toBeNull();
+    expect(short(':books:')).toBeNull();
     expect(short(null)).toBeNull();
+  });
+
+  it('cuts a long description on a whole word', () => {
+    const long = 'word '.repeat(60);
+    const cut = short(long)!;
+    expect(cut.length).toBeLessThanOrEqual(200);
+    expect(cut.endsWith('word...')).toBe(true);
+  });
+
+  it('still cuts a description with no spaces in it', () => {
+    expect(short('x'.repeat(300))).toBe(`${'x'.repeat(197)}...`);
   });
 });

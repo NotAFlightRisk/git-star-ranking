@@ -1,5 +1,6 @@
 <script lang="ts">
   import { page } from '$app/state';
+  import Copy from '#lib/components/Copy.svelte';
   import RankTable from '#lib/components/RankTable.svelte';
   import Seo from '#lib/components/Seo.svelte';
   import Star from '#lib/components/Star.svelte';
@@ -98,6 +99,16 @@
     </div>
   {/if}
 
+  {#if counted}
+    <section class="badge" aria-labelledby="badge">
+      <h2 id="badge">Badge</h2>
+      <img src={badge} alt="git rank badge for {owner.login}" height="20" />
+      <p>For a README, either our own badge or the Shields one:</p>
+      <Copy text="![git rank]({badge})" label="our badge's Markdown" />
+      <Copy text="![git rank]({shields})" label="the Shields badge's Markdown" />
+    </section>
+  {/if}
+
   <section class="repos" aria-labelledby="repos">
     <h2 id="repos">Repositories with 50+ stars</h2>
     {#if data.repos.length}
@@ -111,16 +122,6 @@
       <p class="note">None yet. Forks don't count, and smaller repos still add to the total.</p>
     {/if}
   </section>
-
-  {#if counted}
-    <section class="badge" aria-labelledby="badge">
-      <h2 id="badge">Badge</h2>
-      <img src={badge} alt="git rank badge for {owner.login}" height="20" />
-      <p>For a README, either our own badge or the Shields one:</p>
-      <pre><code>![git rank]({badge})</code></pre>
-      <pre><code>![git rank]({shields})</code></pre>
-    </section>
-  {/if}
 
   {#if data.self}
     <section class="forget" aria-labelledby="forget">
@@ -239,17 +240,6 @@
     h2 {
       font-size: var(--text-xl);
     }
-  }
-
-  pre {
-    margin: 0;
-    padding: var(--space-3);
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    background: var(--surface-raised);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    font-size: var(--text-xs);
   }
 
   .forget form {

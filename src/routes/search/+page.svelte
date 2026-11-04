@@ -36,8 +36,10 @@
           {#each data.owners as owner (owner.id)}
             <li>
               <img src={avatar(owner.id)} alt="" width="24" height="24" loading="lazy" />
-              <a href="/{owner.login}">{owner.login}</a>
-              <span class="kind">{owner.kind ? 'Organization' : 'User'}</span>
+              <div class="name">
+                <a href="/{owner.login}">{owner.login}</a>
+                <span class="kind">{owner.kind ? 'Organization' : 'User'}</span>
+              </div>
               <span class="stars"><Star /> {number(owner.stars)}</span>
             </li>
           {/each}
@@ -55,8 +57,10 @@
         <ul>
           {#each data.repos as repo (repo.id)}
             <li>
-              <a href="/{repo.login}/{repo.name}">{repo.login}/{repo.name}</a>
-              {#if repo.language}<span class="kind">{repo.language}</span>{/if}
+              <div class="name">
+                <a href="/{repo.login}/{repo.name}">{repo.login}/<wbr />{repo.name}</a>
+                {#if repo.language}<span class="kind">{repo.language}</span>{/if}
+              </div>
               <span class="stars"><Star /> {number(repo.stars)}</span>
             </li>
           {/each}
@@ -131,15 +135,21 @@
     img {
       border-radius: 50%;
     }
+  }
+
+  .name {
+    display: grid;
+    min-width: 0;
 
     a {
       font-weight: 600;
-      overflow-wrap: anywhere;
+      overflow-wrap: break-word;
     }
   }
 
   .kind {
     color: var(--text-muted);
+    font-size: var(--text-xs);
   }
 
   .stars {

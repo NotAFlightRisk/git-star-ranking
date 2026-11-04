@@ -12,7 +12,7 @@ export const load = async ({ params, locals }) => {
     if (found === undefined) error(503, 'GitHub is busy just now. Give it a minute and try again.');
     if (found) owner = await findOwner(found.login);
   }
-  if (!owner) error(404, `We don't have ${params.login} yet.`);
+  if (!owner) error(404, `We don't have "${params.login}" yet.`);
   if (owner.login !== params.login) redirect(301, `/${owner.login}`);
   waitUntil(hurry(owner));
   const [repos, rank] = await Promise.all([

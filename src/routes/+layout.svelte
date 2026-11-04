@@ -11,7 +11,7 @@
 <main id="main" tabindex="-1">
   {@render children()}
 </main>
-<Footer />
+<Footer updated={data.updated} />
 
 <style>
   .skip {

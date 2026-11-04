@@ -32,8 +32,8 @@
     <p>
       We find accounts through GitHub's search, by looking for every repo with 50 or more stars,
       about once a week. Accounts with 1,000+ stars are recounted daily, 100+ weekly and the rest
-      monthly. The rankings themselves are rebuilt every night, and each page says when its numbers
-      were last updated.
+      monthly. The rankings themselves are rebuilt every six hours, and each page says when its
+      numbers were last updated.
     </p>
     <p>
       Not here yet? Sign in and visit your own page, and you're counted on the spot. Opening any

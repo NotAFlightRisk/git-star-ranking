@@ -1,3 +1,4 @@
+import { tidy } from '../format.ts';
 import { base64url } from './bytes.ts';
 
 export const API = 'https://api.github.com';
@@ -130,8 +131,7 @@ interface RawOwner {
 
 type Answer<T> = { data?: T; errors?: { type?: string; path?: (string | number)[] }[] };
 
-export const short = (text: string | null) =>
-  text ? text.replace(/\s+/g, ' ').trim().slice(0, 200) || null : null;
+export const short = (text: string | null) => tidy(text);
 
 const toRepo = (raw: RawRepo): Repo => ({
   id: raw.databaseId,
