@@ -32,6 +32,13 @@
     if (page > 1) params.set('page', String(page));
     return `${info.path}${params.size ? `?${params}` : ''}`;
   };
+  const repos = $derived(data.board === 'repositories');
+  const summary = $derived.by(() => {
+    if (data.language) return `The top 500 ${data.language} repositories, ranked by stars.`;
+    const noun = data.board === 'users' ? 'profiles' : subject;
+    const scored = data.total ? ` (${number(data.total)} ${noun} scored)` : '';
+    return `The top 5k GitHub ${subject}, ranked by ${repos ? 'stars' : 'total stars received'}${scored}.`;
+  });
   const first = $derived((data.page - 1) * data.size + 1);
   // a hundred owners sit side by side as two fifties on a wide screen
   const COLUMN = 50;
@@ -64,11 +71,7 @@
 
 <header class="head">
   <h1>{data.language ? `${data.language} repositories` : info.label}</h1>
-  <p>
-    {#if data.total && !data.language}{number(data.total)} ranked by stars, top 5,000 listed.{/if}
-    {#if data.language}The top 500 {data.language} repositories by stars.{/if}
-  </p>
-  <Updated at={data.at} />
+  <p>{summary} <Updated at={data.at} label="Last updated" inline /></p>
 </header>
 
 {#if data.languages.length}
@@ -84,7 +87,7 @@
 {/if}
 
 {#if data.rows.length}
-  <div class="board" class:owners={data.board !== 'repositories'}>
+  <div class="board" class:owners={!repos}>
     {#each columns as rows, i (i)}
       <RankTable
         {rows}
@@ -103,8 +106,8 @@
 <style>
   .head {
     display: grid;
-    gap: var(--space-2);
-    margin-block-end: var(--space-5);
+    gap: var(--space-1);
+    margin-block-end: var(--space-4);
 
     h1 {
       font-size: var(--text-2xl);
