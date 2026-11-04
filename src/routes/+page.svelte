@@ -89,7 +89,7 @@
     display: grid;
     gap: var(--space-2);
     max-width: 36rem;
-    margin-block: var(--space-3);
+    margin-block-start: var(--space-3);
 
     label {
       font-weight: 600;
