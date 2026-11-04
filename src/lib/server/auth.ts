@@ -48,6 +48,12 @@ export async function installationToken() {
 
 const callback = () => `${env.APP_URL}/auth/callback`;
 
+/** Where to land after sign-in: a page on this site, however the address is dressed up */
+export const safeNext = (next: string | null, site: URL) => {
+  const url = new URL(next ?? '/', site);
+  return url.origin === site.origin ? `${url.pathname}${url.search}${url.hash}` : '/';
+};
+
 export const authorizeUrl = (state: string) =>
   `https://github.com/login/oauth/authorize?${new URLSearchParams({
     client_id: env.GITHUB_CLIENT_ID,
@@ -77,7 +83,7 @@ export async function exchange(code: string) {
 
 /** We only ever want a sign-in token for one query, so it goes straight back */
 export async function revoke(token: string) {
-  await fetch(`${API}/applications/${env.GITHUB_CLIENT_ID}/token`, {
+  const res = await fetch(`${API}/applications/${env.GITHUB_CLIENT_ID}/token`, {
     method: 'DELETE',
     headers: {
       ...headers(token),
@@ -85,4 +91,5 @@ export async function revoke(token: string) {
     },
     body: JSON.stringify({ access_token: token })
   });
+  if (!res.ok) throw new Error(`GitHub wouldn't take a sign-in token back (${res.status})`);
 }

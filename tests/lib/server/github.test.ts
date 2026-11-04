@@ -14,6 +14,19 @@ describe('nodeId', () => {
   });
 });
 
+describe('nodeId past 32 bits', () => {
+  const decode = (id: string) => [...Buffer.from(id.slice(2), 'base64url')];
+
+  it('uses a uint32 right up to the limit', () => {
+    expect(decode(nodeId(0, 2 ** 32 - 1))).toEqual([0x92, 0, 0xce, 255, 255, 255, 255]);
+  });
+
+  it('moves to a uint64 after it instead of wrapping round to a small id', () => {
+    expect(decode(nodeId(0, 2 ** 32))).toEqual([0x92, 0, 0xcf, 0, 0, 0, 1, 0, 0, 0, 0]);
+    expect(nodeId(0, 2 ** 32 + 1)).not.toBe(nodeId(0, 1));
+  });
+});
+
 describe('short', () => {
   it('flattens whitespace and trims long descriptions', () => {
     expect(short('  a\n\tb  ')).toBe('a b');

@@ -105,6 +105,7 @@
         rows={data.repos.map((repo) => ({ ...repo, rank: repo.rank ?? 0, login: owner.login }))}
         caption="{owner.login}'s repositories with their overall rank"
         heading="Repository"
+        owned
       />
     {:else}
       <p class="note">None yet. Forks don't count, and smaller repos still add to the total.</p>
@@ -243,7 +244,8 @@
   pre {
     margin: 0;
     padding: var(--space-3);
-    overflow-x: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
     background: var(--surface-raised);
     border: 1px solid var(--border);
     border-radius: var(--radius);

@@ -1,4 +1,5 @@
 import { env } from 'cloudflare:workers';
+import { one } from './db.ts';
 import { meter, meterD1 } from './usage.ts';
 
 /** Snapshots live in R2 when there's a bucket bound, and in a D1 table until then */
@@ -24,9 +25,9 @@ export async function get<T>(key: string): Promise<T | undefined> {
     const object = await env.SNAPSHOTS.get(key);
     return object ? object.json<T>() : undefined;
   }
-  const row = await env.DB.prepare('SELECT body FROM blobs WHERE key = ?')
-    .bind(key)
-    .first<{ body: string }>();
+  const row = await one<{ body: string }>(
+    env.DB.prepare('SELECT body FROM blobs WHERE key = ?').bind(key)
+  );
   return row ? (JSON.parse(row.body) as T) : undefined;
 }
 

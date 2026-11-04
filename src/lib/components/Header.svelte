@@ -24,7 +24,7 @@
         {/each}
       </ul>
     </nav>
-    {#if here !== '/'}
+    {#if here !== '/' && here !== '/search'}
       <form class="search" action="/search" role="search">
         <label class="visually-hidden" for="header-search">Search accounts and repositories</label>
         <input

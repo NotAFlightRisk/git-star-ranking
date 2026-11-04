@@ -2,9 +2,10 @@ import { error, redirect } from '@sveltejs/kit';
 import { waitUntil } from 'cloudflare:workers';
 import { exchange, revoke } from '#lib/server/auth.ts';
 import { refreshSelf } from '#lib/server/crawl.ts';
+import { report } from '#lib/server/report.ts';
 import { writeSession } from '#lib/server/session.ts';
 
-export const GET = async ({ url, cookies }) => {
+export const GET = async ({ url, cookies, request }) => {
   const saved = JSON.parse(cookies.get('sign-in') ?? 'null') as {
     state: string;
     next: string;
@@ -21,6 +22,6 @@ export const GET = async ({ url, cookies }) => {
     await writeSession(cookies, { id: me.id, login: me.login });
     redirect(303, saved.next === '/' ? `/${me.login}` : saved.next);
   } finally {
-    waitUntil(revoke(token));
+    waitUntil(revoke(token).catch((error) => report(error, request)));
   }
 };

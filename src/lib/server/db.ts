@@ -1,5 +1,6 @@
 import { env } from 'cloudflare:workers';
 import { DAY, refreshDays, settings } from './config.ts';
+import { searchQuery, type Job } from './sweep.ts';
 import type { Found, Kind, Owner } from './github.ts';
 import { meterD1 } from './usage.ts';
 
@@ -63,6 +64,13 @@ const DROP_THEIR_REPOS = `
 
 const sql = (text: string, ...values: unknown[]) => env.DB.prepare(text).bind(...values);
 
+/** Reads go through here so the budget sees them, which first() alone wouldn't */
+export const many = async <T>(statement: D1PreparedStatement) =>
+  meterD1(await statement.all<T>()).results;
+
+export const one = async <T>(statement: D1PreparedStatement) =>
+  (await many<T>(statement))[0] ?? null;
+
 const jitter = () => 0.9 + Math.random() * 0.2;
 
 /** Writes what a refresh found, touching only rows that changed */
@@ -116,15 +124,15 @@ export async function saveFound(found: Found[]) {
   );
 }
 
-export async function due(limit: number) {
-  const { results } = await env.DB.prepare(
-    `SELECT id, kind, login, repos, refreshed_at FROM owners
-     WHERE due_at <= ?1 AND hidden = 0 ORDER BY due_at LIMIT ?2`
-  )
-    .bind(seconds(), limit)
-    .all<Pick<OwnerRow, 'id' | 'kind' | 'login' | 'repos' | 'refreshed_at'>>();
-  return results;
-}
+export const due = (limit: number) =>
+  many<Pick<OwnerRow, 'id' | 'kind' | 'login' | 'repos' | 'refreshed_at'>>(
+    sql(
+      `SELECT id, kind, login, repos, refreshed_at FROM owners
+       WHERE due_at <= ?1 AND hidden = 0 ORDER BY due_at LIMIT ?2`,
+      seconds(),
+      limit
+    )
+  );
 
 /** Leaves an owner GitHub wouldn't give us for a day, so one bad account can't wedge the queue */
 export async function snooze(ids: number[]) {
@@ -138,7 +146,7 @@ export async function snooze(ids: number[]) {
 }
 
 export async function readState<T>(key: string) {
-  const row = await sql('SELECT value FROM state WHERE key = ?', key).first<{ value: string }>();
+  const row = await one<{ value: string }>(sql('SELECT value FROM state WHERE key = ?', key));
   return row ? (JSON.parse(row.value) as T) : undefined;
 }
 
@@ -155,39 +163,43 @@ export async function writeState(key: string, value: unknown) {
 /** Pushes an owner to the front of the refresh queue, once per refresh */
 export async function hurry(owner: OwnerRow, after = DAY) {
   if (owner.due_at <= 0 || seconds() - owner.refreshed_at < after) return false;
-  meterD1(
-    await env.DB.prepare('UPDATE owners SET due_at = 0 WHERE id = ? AND due_at > 0')
-      .bind(owner.id)
-      .run()
+  const { meta } = meterD1(
+    await sql(
+      'UPDATE owners SET due_at = 0 WHERE id = ?1 AND due_at > 0 AND refreshed_at < ?2',
+      owner.id,
+      seconds() - after
+    ).run()
   );
-  return true;
+  return meta.changes > 0;
 }
 
 export const findOwner = (login: string) =>
-  env.DB.prepare(
-    `SELECT id, login, kind, stars, repos, refreshed_at, due_at FROM owners
-     WHERE login = ? AND hidden = 0 ORDER BY refreshed_at DESC LIMIT 1`
-  )
-    .bind(login)
-    .first<OwnerRow>();
-
-export const ownerRepos = async (ownerId: number) =>
-  (
-    await env.DB.prepare(
-      `SELECT id, owner_id, name, stars, language, description FROM repos
-       WHERE owner_id = ? ORDER BY stars DESC, id LIMIT 100`
+  one<OwnerRow>(
+    sql(
+      `SELECT id, login, kind, stars, repos, refreshed_at, due_at FROM owners
+       WHERE login = ? AND hidden = 0 ORDER BY refreshed_at DESC LIMIT 1`,
+      login
     )
-      .bind(ownerId)
-      .all<RepoRow>()
-  ).results;
+  );
+
+export const ownerRepos = (ownerId: number) =>
+  many<RepoRow>(
+    sql(
+      `SELECT id, owner_id, name, stars, language, description FROM repos
+       WHERE owner_id = ? ORDER BY stars DESC, id LIMIT 100`,
+      ownerId
+    )
+  );
 
 export const findRepo = (ownerId: number, name: string) =>
-  env.DB.prepare(
-    `SELECT id, owner_id, name, stars, language, description FROM repos
-     WHERE owner_id = ? AND name = ? LIMIT 1`
-  )
-    .bind(ownerId, name)
-    .first<RepoRow>();
+  one<RepoRow>(
+    sql(
+      `SELECT id, owner_id, name, stars, language, description FROM repos
+       WHERE owner_id = ? AND name = ? LIMIT 1`,
+      ownerId,
+      name
+    )
+  );
 
 /** Hides an account for good, and leaves a tombstone so a crawl can't bring it back */
 export async function forget(id: number) {
@@ -236,4 +248,56 @@ export async function search(query: string) {
     owners: found.results as Pick<OwnerRow, 'id' | 'login' | 'kind' | 'stars'>[],
     repos: matched.results as (Omit<RepoRow, 'owner_id'> & { login: string })[]
   };
+}
+
+/** The sweep's ledger, so a retried or duplicated queue message can't count twice */
+export async function addSlices(jobs: Job[]) {
+  const rows = jobs.map((job) => [job.sweep, searchQuery(job), JSON.stringify(job)]);
+  meterD1(
+    await sql(
+      `INSERT INTO slices (sweep, query, job, touched_at)
+       SELECT ${[0, 1, 2].map(each).join(', ')}, ?2 FROM json_each(?1) WHERE true
+       ON CONFLICT (sweep, query) DO NOTHING`,
+      JSON.stringify(rows),
+      seconds()
+    ).run()
+  );
+}
+
+export const sliceDone = async (job: Job) =>
+  meterD1(
+    await sql(
+      'UPDATE slices SET done = 1, touched_at = ?3 WHERE sweep = ?1 AND query = ?2',
+      job.sweep,
+      searchQuery(job),
+      seconds()
+    ).run()
+  );
+
+export const sliceState = (job: Job) =>
+  one<{ done: number }>(
+    sql('SELECT done FROM slices WHERE sweep = ? AND query = ?', job.sweep, searchQuery(job))
+  );
+
+export const sweepProgress = (sweep: string) =>
+  one<{ left: number; touched: number }>(
+    sql(
+      'SELECT SUM(done = 0) AS left, MAX(touched_at) AS touched FROM slices WHERE sweep = ?',
+      sweep
+    )
+  );
+
+/** Hands back slices still to do, marking them touched so they aren't sent twice in a row */
+export async function retouch(sweep: string, limit: number) {
+  const rows = await many<{ job: string }>(
+    sql('SELECT job FROM slices WHERE sweep = ? AND done = 0 LIMIT ?', sweep, limit)
+  );
+  meterD1(
+    await sql(
+      'UPDATE slices SET touched_at = ?2 WHERE sweep = ?1 AND done = 0',
+      sweep,
+      seconds()
+    ).run()
+  );
+  return rows.map((row) => JSON.parse(row.job) as Job);
 }

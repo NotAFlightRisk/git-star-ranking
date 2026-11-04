@@ -1,6 +1,6 @@
 import { generateKeyPairSync } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { appJwt, pkcs8 } from '../../../src/lib/server/auth.ts';
+import { appJwt, pkcs8, safeNext } from '../../../src/lib/server/auth.ts';
 
 const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
 const pkcs1 = privateKey.export({ type: 'pkcs1', format: 'pem' }).toString();
@@ -45,4 +45,20 @@ describe('appJwt', () => {
   it('fails on a key that is not one', async () => {
     await expect(appJwt('123', 'bm90IGEga2V5')).rejects.toThrow();
   });
+});
+
+describe('safeNext', () => {
+  const site = new URL('https://git-star-ranking.peng.ly/login?next=x');
+
+  it('keeps a page on this site, query and all', () => {
+    expect(safeNext('/users?page=2', site)).toBe('/users?page=2');
+    expect(safeNext(null, site)).toBe('/');
+  });
+
+  it.each(['//evil.example', '/\\evil.example', '/\\/evil.example', 'https://evil.example/x'])(
+    'sends %s home instead',
+    (next) => {
+      expect(safeNext(next, site)).toBe('/');
+    }
+  );
 });

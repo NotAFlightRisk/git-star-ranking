@@ -1,6 +1,19 @@
 import { env } from 'cloudflare:workers';
 import { settings } from './config.ts';
-import { due, readState, saveFound, saveOwners, snooze, writeState } from './db.ts';
+import {
+  addSlices,
+  due,
+  readState,
+  retouch,
+  saveFound,
+  saveOwners,
+  seconds,
+  sliceDone,
+  sliceState,
+  snooze,
+  sweepProgress,
+  writeState
+} from './db.ts';
 import {
   GitHubError,
   merge,
@@ -15,33 +28,27 @@ import {
 } from './github.ts';
 import type { Grant } from './pool.ts';
 import { report } from './report.ts';
+import { searchQuery, split, TOP, type Job } from './sweep.ts';
 import { meter } from './usage.ts';
 
-export interface Job {
-  type: 'slice';
-  sweep: string;
-  min: number;
-  max: number;
-  from?: string;
-  to?: string;
-}
+export type { Job } from './sweep.ts';
 
 interface Sweep {
   id: string;
   started: number;
-  pending: number;
   done?: number;
 }
 
 type Take = () => Promise<Grant>;
+type Due = Awaited<ReturnType<typeof due>>[number];
 
 const DAY_MS = 86_400_000;
-const TOP = 10_000_000;
-const EPOCH = Date.parse('2007-10-01T00:00:00Z');
 // GitHub gets through about 100 repos a second and gives up at 10
 const BATCH_REPOS = 400;
 const GUESS = 40;
 const PER_QUERY = 4;
+// a sweep with nothing ticked off for this long has lost messages, so they go round again
+const STALLED = 3600;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -83,38 +90,52 @@ export function pack<T extends { repos: number; refreshed_at: number }>(list: T[
   return batches;
 }
 
-/** Fetches the rest of each owner's repos, up to the page cap. Whatever's left stays partial */
-async function finish(list: Owner[], take: Take) {
+/** The rest of each owner's repos, up to the page cap. A walk cut short isn't returned at all */
+export async function finish(list: Owner[], take: Take) {
   const done = new Map(list.map((owner) => [owner.id, owner]));
+  const cut = new Set<number>();
+  const result = () => [...done.values()].filter((owner) => !cut.has(owner.id));
   for (let page = 2; page <= settings().repoPages; page++) {
-    const open = [...done.values()].filter((owner) => owner.cursor);
+    const open = result().filter((owner) => owner.cursor);
     for (let i = 0; i < open.length; i += PER_QUERY) {
       const { token } = await take();
-      if (!token) return [...done.values()];
+      if (!token) {
+        open.slice(i).forEach((owner) => cut.add(owner.id));
+        return result();
+      }
       const group = open.slice(i, i + PER_QUERY);
       const pages = await nextPages(token, group);
-      group.forEach((owner, n) => done.set(owner.id, merge(owner, pages[n])));
+      group.forEach((owner, n) => {
+        const next = pages[n];
+        if (next) done.set(owner.id, merge(owner, next));
+        else cut.add(owner.id);
+      });
     }
   }
-  return [...done.values()];
+  return result();
 }
 
-async function refresh(batch: Awaited<ReturnType<typeof due>>, token: string, take: Take) {
+async function refresh(batch: Due[], token: string, take: Take) {
   const found = await owners(token, batch);
-  const gone = batch.filter((_, i) => found[i] === null).map(({ id }) => id);
-  const lost = batch.filter((_, i) => found[i] === undefined).map(({ id }) => id);
-  if (lost.length) await snooze(lost);
-  await saveOwners(
-    await finish(
-      found.filter((owner) => !!owner),
-      take
-    ),
-    gone
-  );
+  const missing = batch.filter((_, i) => found[i] === null);
+  const lost = batch.filter((_, i) => found[i] === undefined);
+  // turning a user into an org changes the node id, so look under the other one before deleting
+  const again = missing.length ? (await take()).token : undefined;
+  const flipped = again
+    ? await owners(
+        again,
+        missing.map(({ id, kind }) => ({ id, kind: kind ? 0 : 1 }))
+      )
+    : missing.map(() => undefined);
+  const gone = missing.filter((_, i) => flipped[i] === null).map(({ id }) => id);
+  lost.push(...missing.filter((_, i) => flipped[i] === undefined));
+  if (lost.length) await snooze(lost.map(({ id }) => id));
+  const fetched = [...found, ...flipped].filter((owner): owner is Owner => !!owner);
+  await saveOwners(await finish(fetched, take), gone);
 }
 
 /** Works through the queue; true means it stopped early and the run should too */
-async function stream(queue: Awaited<ReturnType<typeof due>>[], deadline: number) {
+async function stream(queue: Due[][], deadline: number) {
   const take = borrow('graphql', 10);
   while (Date.now() < deadline) {
     const batch = queue.shift();
@@ -154,49 +175,28 @@ export async function refreshDue(deadline: number) {
   }
 }
 
-export const searchQuery = ({ min, max, from, to }: Job) =>
-  `stars:${min}..${max}${from ? ` created:${from}..${to}` : ''}`;
-
-const iso = (ms: number) => new Date(ms).toISOString().replace('.000', '');
-
-/** Halves a slice by stars while it can, then by creation date */
-export function split(job: Job, now = Date.now()): Job[] | undefined {
-  if (job.min < job.max) {
-    const middle = Math.min(job.max - 1, Math.floor(Math.sqrt(job.min * job.max)));
-    return [
-      { ...job, min: middle + 1 },
-      { ...job, max: middle }
-    ];
-  }
-  const from = job.from ? Date.parse(job.from) : EPOCH;
-  const to = job.to ? Date.parse(job.to) : now;
-  if (to - from < 7_200_000) return undefined;
-  const middle = from + Math.floor((to - from) / 2000) * 1000;
-  return [
-    { ...job, from: iso(from), to: iso(middle) },
-    { ...job, from: iso(middle + 1000), to: iso(to) }
-  ];
-}
-
-async function progress(job: Job, delta: number) {
-  const sweep = await readState<Sweep>('sweep');
-  if (sweep?.id !== job.sweep) return;
-  const pending = sweep.pending + delta;
-  await writeState('sweep', { ...sweep, pending, done: pending > 0 ? undefined : Date.now() });
+async function tick(job: Job, sweep: Sweep) {
+  await sliceDone(job);
+  const progress = await sweepProgress(job.sweep);
+  if (!progress?.left) await writeState('sweep', { ...sweep, done: Date.now() });
 }
 
 /** One search slice. Returns how long to wait if the pool says not yet */
 export async function sweepSlice(job: Job) {
+  const [sweep, slice] = await Promise.all([readState<Sweep>('sweep'), sliceState(job)]);
+  // a retry of a slice that's already done, or one left over from an older sweep
+  if (sweep?.id !== job.sweep || !slice || slice.done) return;
   const probe = await borrow('search', 1)();
   if (!probe.token) return probe.wait;
   const query = searchQuery(job);
   const first = await searchRepos(probe.token, query, 1);
   await saveFound(first.items);
-  const halves = first.total > 1000 ? split(job) : undefined;
+  const halves = first.total > 1000 || first.incomplete ? split(job) : undefined;
   if (halves) {
+    await addSlices(halves);
     meter('queue_ops', 3 * halves.length);
     await env.CRAWL.sendBatch(halves.map((body) => ({ body })));
-    return progress(job, halves.length - 1);
+    return tick(job, sweep);
   }
   const pages = Math.min(10, Math.ceil(first.total / 100));
   const take = borrow('search', Math.max(pages - 1, 1));
@@ -208,20 +208,27 @@ export async function sweepSlice(job: Job) {
       page--;
     }
   }
-  return progress(job, -1);
+  return tick(job, sweep);
 }
 
-/** Starts a sweep when the last one's done and old enough, or has clearly stalled */
+/** Starts a sweep when the last one's old enough, and nudges one along that's gone quiet */
 export async function maybeSweep(now = Date.now()) {
   const { sweepDays, minStars } = settings();
   const sweep = await readState<Sweep>('sweep');
-  const running = sweep && sweep.pending > 0 && now - sweep.started < 2 * sweepDays * DAY_MS;
-  const recent = sweep?.done && now - sweep.done < sweepDays * DAY_MS;
-  if (running || recent) return;
-  const id = String(now);
-  await writeState('sweep', { id, started: now, pending: 1 });
+  if (sweep && !sweep.done) {
+    const progress = await sweepProgress(sweep.id);
+    if (!progress?.left || seconds() - progress.touched < STALLED) return;
+    const stuck = await retouch(sweep.id, 100);
+    meter('queue_ops', 3 * stuck.length);
+    await env.CRAWL.sendBatch(stuck.map((body) => ({ body })));
+    return;
+  }
+  if (sweep?.done && now - sweep.done < sweepDays * DAY_MS) return;
+  const root: Job = { type: 'slice', sweep: String(now), min: minStars, max: TOP };
+  await writeState('sweep', { id: root.sweep, started: now });
+  await addSlices([root]);
   meter('queue_ops', 3);
-  await env.CRAWL.send({ type: 'slice', sweep: id, min: minStars, max: TOP });
+  await env.CRAWL.send(root);
 }
 
 /** For a signed-in visitor asking after someone we've not crawled yet */
@@ -232,13 +239,15 @@ export async function lookup(login: string) {
   const owner = await ownerByLogin(token, login);
   if (!owner) return null;
   const [full] = await finish([owner], take);
+  if (!full) return undefined;
   await saveOwners([full]);
   return full;
 }
 
 /** Sign-in refresh, on the visitor's own token and only for their own repos */
 export async function refreshSelf(token: string) {
-  const [me] = await finish([await viewer(token)], async () => ({ token, wait: 0 }));
-  await saveOwners([me]);
+  const me = await viewer(token);
+  const [full] = await finish([me], async () => ({ token, wait: 0 }));
+  if (full) await saveOwners([full]);
   return me;
 }

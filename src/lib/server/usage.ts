@@ -33,16 +33,19 @@ export const month = (at = new Date()) => at.toISOString().slice(0, 7);
 /** One write per flush, and an isolate only flushes once a minute unless told to */
 export async function flush(force = false) {
   if (!counts.size || (!force && Date.now() - flushed < 60_000)) return;
-  const rows = JSON.stringify([...counts]);
+  const rows = [...counts];
   counts.clear();
   flushed = Date.now();
-  await env.DB.prepare(
+  const write = env.DB.prepare(
     `INSERT INTO usage (month, metric, amount)
      SELECT ?1, json_extract(value, '$[0]'), json_extract(value, '$[1]') FROM json_each(?2) WHERE true
      ON CONFLICT (month, metric) DO UPDATE SET amount = amount + excluded.amount`
-  )
-    .bind(month(), rows)
-    .run();
+  ).bind(month(), JSON.stringify(rows));
+  // a failed write keeps its counts for the next go rather than losing the minute
+  await write.run().catch((error) => {
+    for (const [metric, amount] of rows) meter(metric, amount);
+    throw error;
+  });
 }
 
 export async function budget(at = new Date()) {

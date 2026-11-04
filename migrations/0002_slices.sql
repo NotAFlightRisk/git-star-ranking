@@ -1,0 +1,8 @@
+CREATE TABLE slices (
+  sweep TEXT NOT NULL,
+  query TEXT NOT NULL,
+  job TEXT NOT NULL,
+  done INTEGER NOT NULL DEFAULT 0,
+  touched_at INTEGER NOT NULL,
+  PRIMARY KEY (sweep, query)
+) WITHOUT ROWID;

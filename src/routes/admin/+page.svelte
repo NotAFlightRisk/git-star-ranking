@@ -58,8 +58,8 @@
     <li>Accounts due a refresh: {number(data.backlog.due)}</li>
     <li>
       Sweep:
-      {#if data.sweep?.pending}
-        running since {date(data.sweep.started)}, {number(data.sweep.pending)} slices left
+      {#if data.sweep && !data.sweep.done}
+        running since {date(data.sweep.started)}, {number(data.progress?.left ?? 0)} slices left
       {:else if data.sweep?.done}
         last finished {date(data.sweep.done)}
       {:else}

@@ -17,8 +17,9 @@
     rows,
     caption,
     heading,
-    brief = false
-  }: { rows: Row[]; caption: string; heading: string; brief?: boolean } = $props();
+    brief = false,
+    owned = false
+  }: { rows: Row[]; caption: string; heading: string; brief?: boolean; owned?: boolean } = $props();
   const repos = $derived(rows.some((row) => row.name));
 </script>
 
@@ -46,7 +47,8 @@
               loading="lazy"
             />
             <a href={row.name ? `/${row.login}/${row.name}` : `/${row.login}`}>
-              {#if row.name}<span class="owner">{row.login}/</span>{row.name}{:else}{row.login}{/if}
+              {#if row.name && !owned}<span class="owner">{row.login}/</span><wbr
+                />{/if}{row.name ?? row.login}
             </a>
           </div>
           {#if !brief && row.description}<p class="description">{row.description}</p>{/if}
@@ -115,7 +117,12 @@
 
     a {
       font-weight: 600;
-      overflow-wrap: anywhere;
+      overflow-wrap: break-word;
+      text-decoration: none;
+
+      &:hover {
+        text-decoration: underline;
+      }
     }
   }
 
@@ -124,6 +131,7 @@
   }
 
   .description {
+    overflow-wrap: anywhere;
     margin-block-start: var(--space-1);
     margin-inline-start: calc(var(--avatar) + var(--space-2));
     color: var(--text-muted);

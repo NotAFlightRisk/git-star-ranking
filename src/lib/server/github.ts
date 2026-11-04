@@ -72,11 +72,21 @@ async function call(resource: Resource, url: string, init: RequestInit) {
   return res.json();
 }
 
+const WIDTHS = [
+  [2 ** 8, 0xcc, 1],
+  [2 ** 16, 0xcd, 2],
+  [2 ** 32, 0xce, 4],
+  [Infinity, 0xcf, 8]
+] as const;
+
+// msgpack's smallest unsigned int that fits, done in floats so ids past 2^32 survive
 const uint = (n: number) => {
   if (n < 128) return [n];
-  if (n < 256) return [0xcc, n];
-  if (n < 65536) return [0xcd, n >> 8, n & 255];
-  return [0xce, n >>> 24, (n >>> 16) & 255, (n >>> 8) & 255, n & 255];
+  const [, tag, size] = WIDTHS.find(([limit]) => n < limit)!;
+  return [
+    tag,
+    ...Array.from({ length: size }, (_, i) => Math.floor(n / 256 ** (size - 1 - i)) % 256)
+  ];
 };
 
 /** GitHub's newer node ids are msgpack [0, databaseId] behind a type prefix */
@@ -175,13 +185,13 @@ export async function nextPages(token: string, batch: Owner[]) {
     )
     .join('\n');
   const { data } = await graphql<Record<string, RawOwner | null>>(token, `query { ${query} }`);
-  return batch.map((_, i) => data[`o${i}`]);
+  return batch.map((_, i) => (data[`o${i}`]?.repositories ? data[`o${i}`] : null));
 }
 
-export const merge = (owner: Owner, raw: RawOwner | null | undefined): Owner => ({
+export const merge = (owner: Owner, raw: RawOwner): Owner => ({
   ...owner,
-  list: [...owner.list, ...(raw?.repositories.nodes.map(toRepo) ?? [])],
-  cursor: raw ? toOwner(raw).cursor : undefined
+  list: [...owner.list, ...raw.repositories.nodes.map(toRepo)],
+  cursor: toOwner(raw).cursor
 });
 
 export async function ownerByLogin(token: string, login: string) {
@@ -212,7 +222,7 @@ export async function searchRepos(token: string, q: string, page: number) {
   params.set('page', String(page));
   const body = (await call('search', `${API}/search/repositories?${params}`, {
     headers: headers(token)
-  })) as { total_count: number; items: RawFound[] };
+  })) as { total_count: number; incomplete_results: boolean; items: RawFound[] };
   const items = body.items
     .filter(({ owner }) => owner.type === 'User' || owner.type === 'Organization')
     .map((raw): Found => ({
@@ -223,5 +233,5 @@ export async function searchRepos(token: string, q: string, page: number) {
       description: short(raw.description),
       owner: { id: raw.owner.id, login: raw.owner.login, kind: raw.owner.type === 'User' ? 0 : 1 }
     }));
-  return { total: body.total_count, items };
+  return { total: body.total_count, incomplete: body.incomplete_results, items };
 }
