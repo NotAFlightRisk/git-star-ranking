@@ -28,7 +28,7 @@
 
 <section class="intro">
   <h1>Top GitHub users, organizations and repositories</h1>
-  <p>Unofficial GitHub star ranking, counting stars on every public repo an account owns.</p>
+  <p>Unofficial GitHub star ranking on every public repo</p>
   <form class="search" action="/search" role="search">
     <label for="home-search">GitHub username or repo</label>
     <div class="field">
