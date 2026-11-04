@@ -21,6 +21,11 @@ describe('nodeId past 32 bits', () => {
     expect(decode(nodeId(0, 2 ** 32 - 1))).toEqual([0x92, 0, 0xce, 255, 255, 255, 255]);
   });
 
+  it('refuses ids it cannot represent exactly', () => {
+    expect(() => nodeId(0, 2 ** 53)).toThrow(RangeError);
+    expect(() => nodeId(0, -1)).toThrow(RangeError);
+  });
+
   it('moves to a uint64 after it instead of wrapping round to a small id', () => {
     expect(decode(nodeId(0, 2 ** 32))).toEqual([0x92, 0, 0xcf, 0, 0, 0, 1, 0, 0, 0, 0]);
     expect(nodeId(0, 2 ** 32 + 1)).not.toBe(nodeId(0, 1));

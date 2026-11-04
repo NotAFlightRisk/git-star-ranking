@@ -71,6 +71,22 @@ describe('finish', () => {
     expect(owners.map((owner) => owner.id)).toEqual([3]);
   });
 
+  it('drops owners still mid-walk when the pool runs dry between two groups of a page', async () => {
+    const more = {
+      ...lastPage,
+      repositories: {
+        ...lastPage.repositories,
+        pageInfo: { hasNextPage: true, endCursor: 'page3' }
+      }
+    };
+    answer({ o0: more, o1: more, o2: more, o3: more });
+    let calls = 0;
+    const owners = await finish([1, 2, 4, 5, 6].map(big), async () =>
+      calls++ ? { wait: 60_000 } : { token: 't', wait: 0 }
+    );
+    expect(owners).toEqual([]);
+  });
+
   it('drops an owner whose page came back empty rather than calling it complete', async () => {
     answer({ o0: lastPage, o1: null });
     const owners = await finish([big(1), big(2)], async () => ({ token: 't', wait: 0 }));

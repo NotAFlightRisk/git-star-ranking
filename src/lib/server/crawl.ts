@@ -2,6 +2,7 @@ import { env } from 'cloudflare:workers';
 import { settings } from './config.ts';
 import {
   addSlices,
+  claim,
   due,
   readState,
   retouch,
@@ -100,7 +101,7 @@ export async function finish(list: Owner[], take: Take) {
     for (let i = 0; i < open.length; i += PER_QUERY) {
       const { token } = await take();
       if (!token) {
-        open.slice(i).forEach((owner) => cut.add(owner.id));
+        for (const owner of result()) if (owner.cursor) cut.add(owner.id);
         return result();
       }
       const group = open.slice(i, i + PER_QUERY);
@@ -127,9 +128,13 @@ async function refresh(batch: Due[], token: string, take: Take) {
         missing.map(({ id, kind }) => ({ id, kind: kind ? 0 : 1 }))
       )
     : missing.map(() => undefined);
-  const gone = missing.filter((_, i) => flipped[i] === null).map(({ id }) => id);
+  const absent = missing.filter((_, i) => flipped[i] === null);
   lost.push(...missing.filter((_, i) => flipped[i] === undefined));
   if (lost.length) await snooze(lost.map(({ id }) => id));
+  // missing two runs running before it counts as gone, as GitHub has the odd bad hour
+  const gone = absent.filter((owner) => owner.missed).map(({ id }) => id);
+  const once = absent.filter((owner) => !owner.missed).map(({ id }) => id);
+  if (once.length) await snooze(once, true);
   const fetched = [...found, ...flipped].filter((owner): owner is Owner => !!owner);
   await saveOwners(await finish(fetched, take), gone);
 }
@@ -188,10 +193,13 @@ export async function sweepSlice(job: Job) {
   if (sweep?.id !== job.sweep || !slice || slice.done) return;
   const probe = await borrow('search', 1)();
   if (!probe.token) return probe.wait;
+  await claim(job);
   const query = searchQuery(job);
   const first = await searchRepos(probe.token, query, 1);
   await saveFound(first.items);
-  const halves = first.total > 1000 || first.incomplete ? split(job) : undefined;
+  const over = first.total > 1000 || first.incomplete;
+  const halves = over ? split(job) : undefined;
+  if (over && !halves) await report(new Error(`Search slice ${query} won't split any further`));
   if (halves) {
     await addSlices(halves);
     meter('queue_ops', 3 * halves.length);
@@ -215,18 +223,19 @@ export async function sweepSlice(job: Job) {
 export async function maybeSweep(now = Date.now()) {
   const { sweepDays, minStars } = settings();
   const sweep = await readState<Sweep>('sweep');
-  if (sweep && !sweep.done) {
-    const progress = await sweepProgress(sweep.id);
-    if (!progress?.left || seconds() - progress.touched < STALLED) return;
-    const stuck = await retouch(sweep.id, 100);
+  const progress = sweep && !sweep.done ? await sweepProgress(sweep.id) : undefined;
+  // a running sweep with no ledger never got its root written, so it starts again
+  if (progress?.slices) {
+    if (seconds() - progress.touched < STALLED) return;
+    const stuck = await retouch(sweep!.id, 100);
     meter('queue_ops', 3 * stuck.length);
     await env.CRAWL.sendBatch(stuck.map((body) => ({ body })));
     return;
   }
   if (sweep?.done && now - sweep.done < sweepDays * DAY_MS) return;
   const root: Job = { type: 'slice', sweep: String(now), min: minStars, max: TOP };
-  await writeState('sweep', { id: root.sweep, started: now });
   await addSlices([root]);
+  await writeState('sweep', { id: root.sweep, started: now });
   meter('queue_ops', 3);
   await env.CRAWL.send(root);
 }

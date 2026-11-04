@@ -30,7 +30,7 @@ export function meterD1<T extends D1Result | D1Result[]>(results: T) {
 
 export const month = (at = new Date()) => at.toISOString().slice(0, 7);
 
-/** One write per flush, and an isolate only flushes once a minute unless told to */
+/** One write per flush, which isn't metered itself, and only once a minute unless forced */
 export async function flush(force = false) {
   if (!counts.size || (!force && Date.now() - flushed < 60_000)) return;
   const rows = [...counts];
@@ -49,9 +49,11 @@ export async function flush(force = false) {
 }
 
 export async function budget(at = new Date()) {
-  const { results } = await env.DB.prepare('SELECT metric, amount FROM usage WHERE month = ?')
-    .bind(month(at))
-    .all<{ metric: string; amount: number }>();
+  const { results } = meterD1(
+    await env.DB.prepare('SELECT metric, amount FROM usage WHERE month = ?')
+      .bind(month(at))
+      .all<{ metric: string; amount: number }>()
+  );
   const used = new Map(results.map((row) => [row.metric, row.amount]));
   const days = new Date(at.getUTCFullYear(), at.getUTCMonth() + 1, 0).getDate();
   const elapsed = (at.getUTCDate() - 1 + at.getUTCHours() / 24) / days || 1 / (24 * days);

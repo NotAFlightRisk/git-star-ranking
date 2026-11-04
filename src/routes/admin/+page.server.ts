@@ -5,7 +5,7 @@ import { settings } from '#lib/server/config.ts';
 import { maybeSweep } from '#lib/server/crawl.ts';
 import { readState, seconds, sweepProgress, writeState } from '#lib/server/db.ts';
 import { snapshot } from '#lib/server/snapshot.ts';
-import { budget } from '#lib/server/usage.ts';
+import { budget, meterD1 } from '#lib/server/usage.ts';
 
 const admin = (login?: string) => {
   if (!login || !settings().admins.includes(login.toLowerCase())) error(404, 'Not found');
@@ -13,16 +13,18 @@ const admin = (login?: string) => {
 
 export const load = async ({ locals }) => {
   admin(locals.user?.login);
-  const [counts, backlog] = await env.DB.batch([
-    env.DB.prepare(
-      `SELECT kind, COUNT(*) AS accounts, SUM(refreshed_at > 0) AS counted, SUM(hidden) AS hidden
+  const [counts, backlog] = meterD1(
+    await env.DB.batch([
+      env.DB.prepare(
+        `SELECT kind, COUNT(*) AS accounts, SUM(refreshed_at > 0) AS counted, SUM(hidden) AS hidden
        FROM owners GROUP BY kind ORDER BY kind`
-    ),
-    env.DB.prepare(
-      `SELECT (SELECT COUNT(*) FROM repos) AS repos,
+      ),
+      env.DB.prepare(
+        `SELECT (SELECT COUNT(*) FROM repos) AS repos,
          (SELECT COUNT(*) FROM owners WHERE due_at <= ?1 AND hidden = 0) AS due`
-    ).bind(seconds())
-  ]);
+      ).bind(seconds())
+    ])
+  );
   const sweep = await readState<{ id: string; started: number; done?: number }>('sweep');
   return {
     sweep,

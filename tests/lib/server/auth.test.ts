@@ -55,10 +55,13 @@ describe('safeNext', () => {
     expect(safeNext(null, site)).toBe('/');
   });
 
-  it.each(['//evil.example', '/\\evil.example', '/\\/evil.example', 'https://evil.example/x'])(
-    'sends %s home instead',
-    (next) => {
-      expect(safeNext(next, site)).toBe('/');
-    }
-  );
+  it.each([
+    '//evil.example',
+    '/\\evil.example',
+    '/\\/evil.example',
+    'https://evil.example/x',
+    'http://['
+  ])('sends %s home instead', (next) => {
+    expect(safeNext(next, site)).toBe('/');
+  });
 });

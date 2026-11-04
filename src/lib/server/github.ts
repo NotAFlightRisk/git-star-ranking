@@ -81,6 +81,7 @@ const WIDTHS = [
 
 // msgpack's smallest unsigned int that fits, done in floats so ids past 2^32 survive
 const uint = (n: number) => {
+  if (!Number.isSafeInteger(n) || n < 0) throw new RangeError(`${n} isn't a GitHub id`);
   if (n < 128) return [n];
   const [, tag, size] = WIDTHS.find(([limit]) => n < limit)!;
   return [

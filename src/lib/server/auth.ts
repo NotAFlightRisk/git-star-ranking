@@ -50,8 +50,8 @@ const callback = () => `${env.APP_URL}/auth/callback`;
 
 /** Where to land after sign-in: a page on this site, however the address is dressed up */
 export const safeNext = (next: string | null, site: URL) => {
-  const url = new URL(next ?? '/', site);
-  return url.origin === site.origin ? `${url.pathname}${url.search}${url.hash}` : '/';
+  const url = URL.parse(next ?? '/', site);
+  return url?.origin === site.origin ? `${url.pathname}${url.search}${url.hash}` : '/';
 };
 
 export const authorizeUrl = (state: string) =>

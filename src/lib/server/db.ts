@@ -12,6 +12,7 @@ export interface OwnerRow {
   repos: number;
   refreshed_at: number;
   due_at: number;
+  missed: number;
 }
 
 export interface RepoRow {
@@ -42,7 +43,7 @@ const UPSERT_OWNERS = `
   SELECT ${[0, 1, 2, 3, 4].map(each).join(', ')}, ?2, ${each(5)} FROM json_each(?1) WHERE true
   ON CONFLICT (id) DO UPDATE SET login = excluded.login, kind = excluded.kind,
     stars = excluded.stars, repos = excluded.repos, refreshed_at = excluded.refreshed_at,
-    due_at = excluded.due_at
+    due_at = excluded.due_at, missed = 0
   WHERE owners.hidden = 0`;
 
 // a stub waits on its first refresh, biggest first, as due_at sorts below everyone else
@@ -125,9 +126,9 @@ export async function saveFound(found: Found[]) {
 }
 
 export const due = (limit: number) =>
-  many<Pick<OwnerRow, 'id' | 'kind' | 'login' | 'repos' | 'refreshed_at'>>(
+  many<Pick<OwnerRow, 'id' | 'kind' | 'login' | 'repos' | 'refreshed_at' | 'missed'>>(
     sql(
-      `SELECT id, kind, login, repos, refreshed_at FROM owners
+      `SELECT id, kind, login, repos, refreshed_at, missed FROM owners
        WHERE due_at <= ?1 AND hidden = 0 ORDER BY due_at LIMIT ?2`,
       seconds(),
       limit
@@ -135,12 +136,14 @@ export const due = (limit: number) =>
   );
 
 /** Leaves an owner GitHub wouldn't give us for a day, so one bad account can't wedge the queue */
-export async function snooze(ids: number[]) {
+export async function snooze(ids: number[], missed = false) {
   meterD1(
     await sql(
-      'UPDATE owners SET due_at = ?2 WHERE id IN (SELECT value FROM json_each(?1))',
+      `UPDATE owners SET due_at = ?2, missed = missed OR ?3
+       WHERE id IN (SELECT value FROM json_each(?1))`,
       JSON.stringify(ids),
-      seconds() + DAY
+      seconds() + DAY,
+      Number(missed)
     ).run()
   );
 }
@@ -165,7 +168,7 @@ export async function hurry(owner: OwnerRow, after = DAY) {
   if (owner.due_at <= 0 || seconds() - owner.refreshed_at < after) return false;
   const { meta } = meterD1(
     await sql(
-      'UPDATE owners SET due_at = 0 WHERE id = ?1 AND due_at > 0 AND refreshed_at < ?2',
+      'UPDATE owners SET due_at = 0 WHERE id = ?1 AND due_at > 0 AND refreshed_at <= ?2',
       owner.id,
       seconds() - after
     ).run()
@@ -176,7 +179,7 @@ export async function hurry(owner: OwnerRow, after = DAY) {
 export const findOwner = (login: string) =>
   one<OwnerRow>(
     sql(
-      `SELECT id, login, kind, stars, repos, refreshed_at, due_at FROM owners
+      `SELECT id, login, kind, stars, repos, refreshed_at, due_at, missed FROM owners
        WHERE login = ? AND hidden = 0 ORDER BY refreshed_at DESC LIMIT 1`,
       login
     )
@@ -280,22 +283,41 @@ export const sliceState = (job: Job) =>
   );
 
 export const sweepProgress = (sweep: string) =>
-  one<{ left: number; touched: number }>(
+  one<{ slices: number; left: number; touched: number }>(
     sql(
-      'SELECT SUM(done = 0) AS left, MAX(touched_at) AS touched FROM slices WHERE sweep = ?',
+      `SELECT COUNT(*) AS slices, SUM(done = 0) AS left, MAX(touched_at) AS touched
+       FROM slices WHERE sweep = ?`,
       sweep
     )
   );
 
-/** Hands back slices still to do, marking them touched so they aren't sent twice in a row */
+/** A worker's started on this one, so the stall check knows the queue's still moving */
+export const claim = async (job: Job) =>
+  meterD1(
+    await sql(
+      'UPDATE slices SET touched_at = ?3 WHERE sweep = ?1 AND query = ?2',
+      job.sweep,
+      searchQuery(job),
+      seconds()
+    ).run()
+  );
+
+/** The longest-waiting slices still to do, touched so the same ones aren't sent again next time */
 export async function retouch(sweep: string, limit: number) {
-  const rows = await many<{ job: string }>(
-    sql('SELECT job FROM slices WHERE sweep = ? AND done = 0 LIMIT ?', sweep, limit)
+  const rows = await many<{ query: string; job: string }>(
+    sql(
+      `SELECT query, job FROM slices WHERE sweep = ? AND done = 0
+       ORDER BY touched_at, query LIMIT ?`,
+      sweep,
+      limit
+    )
   );
   meterD1(
     await sql(
-      'UPDATE slices SET touched_at = ?2 WHERE sweep = ?1 AND done = 0',
+      `UPDATE slices SET touched_at = ?3
+       WHERE sweep = ?1 AND query IN (SELECT value FROM json_each(?2))`,
       sweep,
+      JSON.stringify(rows.map((row) => row.query)),
       seconds()
     ).run()
   );
