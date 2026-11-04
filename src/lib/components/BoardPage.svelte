@@ -12,6 +12,7 @@
       board: 'users' | 'organizations' | 'repositories';
       page: number;
       pages: number;
+      size: number;
       rows: ComponentProps<typeof RankTable>['rows'];
       at?: number;
       total: number;
@@ -31,7 +32,18 @@
     if (page > 1) params.set('page', String(page));
     return `${info.path}${params.size ? `?${params}` : ''}`;
   };
-  const first = $derived((data.page - 1) * 50 + 1);
+  const first = $derived((data.page - 1) * data.size + 1);
+  // a hundred owners sit side by side as two fifties on a wide screen
+  const COLUMN = 50;
+  const columns = $derived(
+    Array.from({ length: Math.ceil(data.rows.length / COLUMN) }, (_, i) =>
+      data.rows.slice(i * COLUMN, (i + 1) * COLUMN)
+    )
+  );
+  const caption = (column: number, count: number) => {
+    const from = first + column * COLUMN;
+    return `${subject} ranked by stars, ${number(from)} to ${number(from + count - 1)}, page ${data.page} of ${data.pages}`;
+  };
 
   // on a phone the chips are one scrolling row, so start it on the one you're looking at
   const centre = (nav: HTMLElement) => {
@@ -73,13 +85,15 @@
 
 {#if data.rows.length}
   <div class="board" class:owners={data.board !== 'repositories'}>
-    <RankTable
-      rows={data.rows}
-      caption="{subject} ranked by stars, page {data.page} of {data.pages}"
-      heading={info.noun}
-      languages={!data.language}
-      me={page.data.user?.id}
-    />
+    {#each columns as rows, i (i)}
+      <RankTable
+        {rows}
+        caption={caption(i, rows.length)}
+        heading={info.noun}
+        languages={!data.language}
+        me={page.data.user?.id}
+      />
+    {/each}
   </div>
   <Pager page={data.page} pages={data.pages} {href} />
 {:else}
@@ -128,11 +142,21 @@
   }
 
   .board.owners {
+    display: grid;
+    gap: var(--space-5) var(--space-6);
+    align-items: start;
     max-width: 44rem;
   }
 
   .empty {
     color: var(--text-muted);
+  }
+
+  @media (min-width: 64rem) {
+    .board.owners {
+      grid-template-columns: 1fr 1fr;
+      max-width: none;
+    }
   }
 
   @media (max-width: 40rem) {

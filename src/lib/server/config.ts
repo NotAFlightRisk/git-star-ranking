@@ -1,8 +1,7 @@
 import { env } from 'cloudflare:workers';
 
-export const PAGE_SIZE = 50;
-export const PAGES = 100;
-export const BOARD_SIZE = PAGE_SIZE * PAGES;
+export const BOARD_SIZE = 5_000;
+export const PAGE_SIZE = { users: 100, organizations: 100, repositories: 50 } as const;
 export const LANGUAGES = 30;
 export const LANGUAGE_PAGES = 10;
 export const DAY = 86_400;
