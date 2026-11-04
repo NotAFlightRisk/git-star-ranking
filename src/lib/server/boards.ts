@@ -45,7 +45,7 @@ export async function boardLoad(board: Board, url: URL) {
     board,
     page,
     pages,
-    size: PAGE_SIZE[board],
+    size: latest?.boards[board].size ?? PAGE_SIZE[board],
     rows,
     at,
     total: latest?.boards[board].total ?? 0,
