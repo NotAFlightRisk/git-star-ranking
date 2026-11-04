@@ -33,12 +33,12 @@ const REPO_COLUMNS = 'r.id, r.owner_id, o.login, r.name, r.stars, r.language, r.
 
 export const slug = (language: string) => encodeURIComponent(language.toLowerCase());
 
-async function publish(key: string, rows: { stars: number }[]) {
+async function publish(key: string, rows: { stars: number }[], size: number) {
   const ranked = competition(rows);
-  const pages = Math.ceil(ranked.length / PAGE_SIZE);
+  const pages = Math.ceil(ranked.length / size);
   await Promise.all(
     Array.from({ length: pages }, (_, page) =>
-      put(`${key}/${page + 1}`, ranked.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE))
+      put(`${key}/${page + 1}`, ranked.slice(page * size, (page + 1) * size))
     )
   );
   return pages;
@@ -54,7 +54,7 @@ async function board(name: Board, top: D1PreparedStatement, counts: D1PreparedSt
     `history/${name}/${date}`,
     ranked.map(({ id }) => id)
   );
-  return { total: spread.total, pages: await publish(`board/${name}`, ranked) };
+  return { total: spread.total, pages: await publish(`board/${name}`, ranked, PAGE_SIZE[name]) };
 }
 
 async function languageBoards() {
@@ -74,7 +74,10 @@ async function languageBoards() {
          ${REPOS} AND r.language IN (SELECT value FROM json_each(?1))
        ) WHERE pos <= ?2 ORDER BY language, pos`
     )
-      .bind(JSON.stringify(languages.map(({ name }) => name)), LANGUAGE_PAGES * PAGE_SIZE)
+      .bind(
+        JSON.stringify(languages.map(({ name }) => name)),
+        LANGUAGE_PAGES * PAGE_SIZE.repositories
+      )
       .all<Omit<RepoEntry, 'rank'>>()
   );
   return Promise.all(
@@ -83,7 +86,8 @@ async function languageBoards() {
       slug: slug(name),
       pages: await publish(
         `board/repositories/${slug(name)}`,
-        results.filter((row) => row.language === name)
+        results.filter((row) => row.language === name),
+        PAGE_SIZE.repositories
       )
     }))
   );

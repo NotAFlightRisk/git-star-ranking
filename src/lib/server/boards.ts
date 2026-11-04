@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { PAGES } from './config.ts';
+import { PAGE_SIZE } from './config.ts';
 import { percentile, rankOf, type Histogram } from './rank.ts';
 import { slug, type Board, type Meta, type OwnerEntry, type RepoEntry } from './snapshot.ts';
 import { cached, get } from './store.ts';
@@ -21,7 +21,7 @@ export async function entries<T extends OwnerEntry | RepoEntry>(key: string, pag
 export function pageNumber(url: URL, pages: number) {
   const raw = url.searchParams.get('page') ?? '1';
   const page = Number(raw);
-  if (!/^\d+$/.test(raw) || page < 1 || page > Math.max(pages, 1) || page > PAGES) {
+  if (!/^\d+$/.test(raw) || page < 1 || page > Math.max(pages, 1)) {
     error(404, 'There are no more pages of this one');
   }
   return page;
@@ -45,6 +45,7 @@ export async function boardLoad(board: Board, url: URL) {
     board,
     page,
     pages,
+    size: PAGE_SIZE[board],
     rows,
     at,
     total: latest?.boards[board].total ?? 0,

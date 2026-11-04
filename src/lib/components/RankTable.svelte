@@ -62,8 +62,11 @@
                 loading="lazy"
               />
             {/if}
-            <a href={row.name ? `/${row.login}/${row.name}` : `/${row.login}`}>
-              {#if row.name && !owned}<span class="owner">{row.login}/</span><wbr
+            <a
+              href={row.name ? `/${row.login}/${row.name}` : `/${row.login}`}
+              title={row.name && brief ? `${row.login}/${row.name}` : undefined}
+            >
+              {#if row.name && !owned && !brief}<span class="owner">{row.login}/</span><wbr
                 />{/if}{row.name ?? row.login}
             </a>
           </div>

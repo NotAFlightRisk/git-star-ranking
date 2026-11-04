@@ -1,11 +1,9 @@
 <svg class="logo" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+  <path class="ribbon" d="M5.75 2.25h6.5L16 9.75l3.75-7.5h6.5l-6.5 12h-7.5z" />
   <path
     class="star"
-    d="M16 1.5l1.59 4.32 4.59.17-3.61 2.84 1.25 4.43L16 10.7l-3.82 2.56 1.25-4.43-3.61-2.84 4.59-.17z"
+    d="M16 11.23 19.03 17.43 25.8 18.44 20.9 23.19 22.05 29.97 16 26.8 9.95 29.97 11.1 23.19 6.2 18.44 12.97 17.43z"
   />
-  <rect class="step" x="3" y="20" width="8" height="10" rx="1.5" />
-  <rect class="step" x="12" y="15.5" width="8" height="14.5" rx="1.5" />
-  <rect class="step" x="21" y="23.5" width="8" height="6.5" rx="1.5" />
 </svg>
 
 <style>
@@ -13,13 +11,17 @@
     width: 1.75rem;
     height: 1.75rem;
     flex: none;
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+  }
+
+  .ribbon {
+    fill: var(--accent);
+    stroke: var(--accent);
   }
 
   .star {
     fill: var(--star);
-  }
-
-  .step {
-    fill: var(--accent);
+    stroke: var(--star);
   }
 </style>

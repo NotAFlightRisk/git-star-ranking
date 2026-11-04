@@ -11,6 +11,7 @@
   const owner = $derived(data.owner);
   const noun = $derived(owner.kind ? 'organization' : 'user');
   const counted = $derived(owner.refreshed_at > 0);
+  const profile = $derived(`${page.url.origin}/${owner.login}`);
   const badge = $derived(`${page.url.origin}/users/${owner.login}/badge.svg`);
   const shields = $derived(
     `https://img.shields.io/endpoint?url=${encodeURIComponent(`${page.url.origin}/users/${owner.login}/shields`)}`
@@ -104,8 +105,8 @@
       <h2 id="badge">Badge</h2>
       <img src={badge} alt="git rank badge for {owner.login}" height="20" />
       <p>For a README, either our own badge or the Shields one:</p>
-      <Copy text="![git rank]({badge})" label="our badge's Markdown" />
-      <Copy text="![git rank]({shields})" label="the Shields badge's Markdown" />
+      <Copy text="[![git rank]({badge})]({profile})" label="our badge's Markdown" />
+      <Copy text="[![git rank]({shields})]({profile})" label="the Shields badge's Markdown" />
     </section>
   {/if}
 

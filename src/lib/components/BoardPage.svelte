@@ -12,6 +12,7 @@
       board: 'users' | 'organizations' | 'repositories';
       page: number;
       pages: number;
+      size: number;
       rows: ComponentProps<typeof RankTable>['rows'];
       at?: number;
       total: number;
@@ -31,7 +32,25 @@
     if (page > 1) params.set('page', String(page));
     return `${info.path}${params.size ? `?${params}` : ''}`;
   };
-  const first = $derived((data.page - 1) * 50 + 1);
+  const repos = $derived(data.board === 'repositories');
+  const summary = $derived.by(() => {
+    if (data.language) return `The top 500 ${data.language} repositories, ranked by stars.`;
+    const noun = data.board === 'users' ? 'profiles' : subject;
+    const scored = data.total ? ` (${number(data.total)} ${noun} scored)` : '';
+    return `The top 5k GitHub ${subject}, ranked by ${repos ? 'stars' : 'total stars received'}${scored}.`;
+  });
+  const first = $derived((data.page - 1) * data.size + 1);
+  // a hundred owners sit side by side as two fifties on a wide screen
+  const COLUMN = 50;
+  const columns = $derived(
+    Array.from({ length: Math.ceil(data.rows.length / COLUMN) }, (_, i) =>
+      data.rows.slice(i * COLUMN, (i + 1) * COLUMN)
+    )
+  );
+  const caption = (column: number, count: number) => {
+    const from = first + column * COLUMN;
+    return `${subject} ranked by stars, ${number(from)} to ${number(from + count - 1)}, page ${data.page} of ${data.pages}`;
+  };
 
   // on a phone the chips are one scrolling row, so start it on the one you're looking at
   const centre = (nav: HTMLElement) => {
@@ -52,11 +71,7 @@
 
 <header class="head">
   <h1>{data.language ? `${data.language} repositories` : info.label}</h1>
-  <p>
-    {#if data.total && !data.language}{number(data.total)} ranked by stars, top 5,000 listed.{/if}
-    {#if data.language}The top 500 {data.language} repositories by stars.{/if}
-  </p>
-  <Updated at={data.at} />
+  <p>{summary} <Updated at={data.at} label="Last updated" inline /></p>
 </header>
 
 {#if data.languages.length}
@@ -72,14 +87,16 @@
 {/if}
 
 {#if data.rows.length}
-  <div class="board" class:owners={data.board !== 'repositories'}>
-    <RankTable
-      rows={data.rows}
-      caption="{subject} ranked by stars, page {data.page} of {data.pages}"
-      heading={info.noun}
-      languages={!data.language}
-      me={page.data.user?.id}
-    />
+  <div class="board" class:owners={!repos}>
+    {#each columns as rows, i (i)}
+      <RankTable
+        {rows}
+        caption={caption(i, rows.length)}
+        heading={info.noun}
+        languages={!data.language}
+        me={page.data.user?.id}
+      />
+    {/each}
   </div>
   <Pager page={data.page} pages={data.pages} {href} />
 {:else}
@@ -89,8 +106,8 @@
 <style>
   .head {
     display: grid;
-    gap: var(--space-2);
-    margin-block-end: var(--space-5);
+    gap: var(--space-1);
+    margin-block-end: var(--space-4);
 
     h1 {
       font-size: var(--text-2xl);
@@ -128,11 +145,21 @@
   }
 
   .board.owners {
+    display: grid;
+    gap: var(--space-5) var(--space-6);
+    align-items: start;
     max-width: 44rem;
   }
 
   .empty {
     color: var(--text-muted);
+  }
+
+  @media (min-width: 64rem) {
+    .board.owners {
+      grid-template-columns: 1fr 1fr;
+      max-width: none;
+    }
   }
 
   @media (max-width: 40rem) {
