@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { nodeId, short } from '../../../src/lib/server/github.ts';
+import { describe, expect, it, vi } from 'vitest';
+import { nodeId, short, viewer } from '../../../src/lib/server/github.ts';
 
 describe('nodeId', () => {
   // checked against GitHub's GraphQL API on 2026-11-04
@@ -57,5 +57,20 @@ describe('short', () => {
 
   it('still cuts a description with no spaces in it', () => {
     expect(short('x'.repeat(300))).toBe(`${'x'.repeat(197)}...`);
+  });
+});
+
+describe('viewer', () => {
+  it('only asks a User for what a User has, or GitHub refuses the whole query', async () => {
+    let query = '';
+    vi.stubGlobal('fetch', async (_: string, init: RequestInit) => {
+      query = JSON.parse(String(init.body)).query;
+      const repositories = { totalCount: 0, pageInfo: { hasNextPage: false }, nodes: [] };
+      const viewer = { __typename: 'User', databaseId: 1, login: 'octo', repositories };
+      return new Response(JSON.stringify({ data: { viewer } }));
+    });
+    await expect(viewer('token')).resolves.toMatchObject({ id: 1, login: 'octo', kind: 0 });
+    expect(query).not.toMatch(/on Organization/);
+    vi.unstubAllGlobals();
   });
 });

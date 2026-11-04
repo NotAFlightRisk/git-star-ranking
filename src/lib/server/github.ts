@@ -205,7 +205,10 @@ export async function ownerByLogin(token: string, login: string) {
 }
 
 export async function viewer(token: string) {
-  const { data } = await graphql<{ viewer: RawOwner }>(token, `query { viewer { ${fields()} } }`);
+  const { data } = await graphql<{ viewer: RawOwner }>(
+    token,
+    `query { viewer { __typename databaseId login ${repositories(null)} } }`
+  );
   return toOwner(data.viewer);
 }
 
