@@ -27,6 +27,7 @@
       }
     ]
   },
+  "r2_buckets": [{ "binding": "SNAPSHOTS", "bucket_name": "git-star-ranking-snapshots" }],
   "durable_objects": { "bindings": [{ "name": "POOL", "class_name": "TokenPool" }] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TokenPool"] }],
   "triggers": { "crons": ["*/10 * * * *", "17 */6 * * *"] },

@@ -111,7 +111,7 @@ Settings, in `vars` in `wrangler.jsonc`:
 | `STREAMS`          | `2`                 | GraphQL queries the cron runs side by side                |
 | `ADMINS`           |                     | Comma-separated logins that can see `/admin`              |
 
-Snapshots go in D1. Bind an R2 bucket as `SNAPSHOTS` and they go there instead.
+Snapshots go in the R2 bucket bound as `SNAPSHOTS`, so make one first with `npx wrangler r2 bucket create git-star-ranking-snapshots`. Drop the binding and they go in D1 instead.
 
 The client build reads `PUBLIC_PLAUSIBLE_SCRIPT` and `PUBLIC_SENTRY_DSN` at build time. Both are empty unless you set them, so nothing phones home.
 
