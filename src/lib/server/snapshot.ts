@@ -69,26 +69,24 @@ async function languageBoards() {
       .bind(LANGUAGES)
       .all<{ name: string }>()
   );
-  const { results } = meterD1(
-    await env.DB.prepare(
-      `SELECT ${REPO_COLUMNS} FROM (
-         SELECT *, ROW_NUMBER() OVER (PARTITION BY language ORDER BY stars DESC, id) AS pos
-         FROM repos WHERE language IN (SELECT value FROM json_each(?1))
-       ) r ${WITH_OWNER} AND r.pos <= ?2 ORDER BY r.language, r.pos`
-    )
-      .bind(
-        JSON.stringify(languages.map(({ name }) => name)),
-        LANGUAGE_PAGES * PAGE_SIZE.repositories
+  if (!languages.length) return [];
+  const tops = meterD1(
+    await env.DB.batch(
+      languages.map(({ name }) =>
+        env.DB.prepare(
+          `SELECT ${REPO_COLUMNS} FROM repos r ${WITH_OWNER} AND r.language = ?1
+           ORDER BY r.stars DESC, r.id LIMIT ?2`
+        ).bind(name, LANGUAGE_PAGES * PAGE_SIZE.repositories)
       )
-      .all<Omit<RepoEntry, 'rank'>>()
+    )
   );
   return Promise.all(
-    languages.map(async ({ name }) => ({
+    languages.map(async ({ name }, i) => ({
       name,
       slug: slug(name),
       pages: await publish(
         `board/repositories/${slug(name)}`,
-        results.filter((row) => row.language === name),
+        tops[i].results as Omit<RepoEntry, 'rank'>[],
         PAGE_SIZE.repositories
       )
     }))
