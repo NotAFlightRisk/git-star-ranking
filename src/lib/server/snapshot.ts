@@ -2,7 +2,7 @@ import { env } from 'cloudflare:workers';
 import { BOARD_SIZE, LANGUAGES, LANGUAGE_PAGES, PAGE_SIZE } from './config.ts';
 import { competition, histogram } from './rank.ts';
 import { readState } from './db.ts';
-import { get, put } from './store.ts';
+import { get, put, putAll } from './store.ts';
 import { meterD1 } from './usage.ts';
 
 export type Board = 'users' | 'organizations' | 'repositories';
@@ -28,7 +28,8 @@ export interface Meta {
 }
 
 const OWNERS = 'FROM owners WHERE kind = ?1 AND hidden = 0 AND refreshed_at > 0 AND stars > 0';
-const REPOS = 'FROM repos r JOIN owners o ON o.id = r.owner_id WHERE o.hidden = 0';
+// hiding an owner deletes their repos, so only the rows we publish need the join
+const WITH_OWNER = 'JOIN owners o ON o.id = r.owner_id WHERE o.hidden = 0';
 const REPO_COLUMNS = 'r.id, r.owner_id, o.login, r.name, r.stars, r.language, r.description';
 
 export const slug = (language: string) => encodeURIComponent(language.toLowerCase());
@@ -36,10 +37,11 @@ export const slug = (language: string) => encodeURIComponent(language.toLowerCas
 async function publish(key: string, rows: { stars: number }[], size: number) {
   const ranked = competition(rows);
   const pages = Math.ceil(ranked.length / size);
-  await Promise.all(
-    Array.from({ length: pages }, (_, page) =>
-      put(`${key}/${page + 1}`, ranked.slice(page * size, (page + 1) * size))
-    )
+  await putAll(
+    Array.from({ length: pages }, (_, page) => [
+      `${key}/${page + 1}`,
+      ranked.slice(page * size, (page + 1) * size)
+    ])
   );
   return pages;
 }
@@ -61,19 +63,18 @@ async function board(name: Board, top: D1PreparedStatement, counts: D1PreparedSt
 async function languageBoards() {
   const { results: languages } = meterD1(
     await env.DB.prepare(
-      `SELECT r.language AS name, COUNT(*) AS n ${REPOS} AND r.language IS NOT NULL
-       GROUP BY r.language ORDER BY n DESC LIMIT ?1`
+      `SELECT language AS name, COUNT(*) AS n FROM repos WHERE language IS NOT NULL
+       GROUP BY language ORDER BY n DESC LIMIT ?1`
     )
       .bind(LANGUAGES)
       .all<{ name: string }>()
   );
   const { results } = meterD1(
     await env.DB.prepare(
-      `SELECT id, owner_id, login, name, stars, language, description FROM (
-         SELECT ${REPO_COLUMNS},
-           ROW_NUMBER() OVER (PARTITION BY r.language ORDER BY r.stars DESC, r.id) AS pos
-         ${REPOS} AND r.language IN (SELECT value FROM json_each(?1))
-       ) WHERE pos <= ?2 ORDER BY language, pos`
+      `SELECT ${REPO_COLUMNS} FROM (
+         SELECT *, ROW_NUMBER() OVER (PARTITION BY language ORDER BY stars DESC, id) AS pos
+         FROM repos WHERE language IN (SELECT value FROM json_each(?1))
+       ) r ${WITH_OWNER} AND r.pos <= ?2 ORDER BY r.language, r.pos`
     )
       .bind(
         JSON.stringify(languages.map(({ name }) => name)),
@@ -112,12 +113,11 @@ export async function snapshot() {
     organizations: await board('organizations', ...owners(1)),
     repositories: await board(
       'repositories',
-      env.DB.prepare(`SELECT ${REPO_COLUMNS} ${REPOS} ORDER BY r.stars DESC, r.id LIMIT ?1`).bind(
-        BOARD_SIZE
-      ),
       env.DB.prepare(
-        `SELECT r.stars, COUNT(*) AS n ${REPOS} GROUP BY r.stars ORDER BY r.stars DESC`
-      )
+        `SELECT ${REPO_COLUMNS} FROM (SELECT * FROM repos ORDER BY stars DESC, id LIMIT ?1) r
+         ${WITH_OWNER} ORDER BY r.stars DESC, r.id`
+      ).bind(BOARD_SIZE),
+      env.DB.prepare('SELECT stars, COUNT(*) AS n FROM repos GROUP BY stars ORDER BY stars DESC')
     )
   };
   const meta: Meta = { at, boards, languages: await languageBoards() };
@@ -129,11 +129,11 @@ export async function snapshot() {
 export const outOfShape = (meta: Meta) =>
   Object.entries(PAGE_SIZE).some(([board, size]) => meta.boards[board as Board].size !== size);
 
-/** On top of the cron's own slots: when the last one's out of shape, and hourly while the first sweep fills the tables */
+/** On top of the cron's own slots: when the last one's out of shape, and on the hour while the first sweep fills the tables */
 export async function filling() {
   const [meta, sweep] = await Promise.all([
     get<Meta>('meta'),
     readState<{ done?: number }>('sweep')
   ]);
-  return !meta || outOfShape(meta) || (!sweep?.done && Date.now() - meta.at > 3_600_000);
+  return !meta || outOfShape(meta) || (!sweep?.done && new Date().getUTCMinutes() < 10);
 }
