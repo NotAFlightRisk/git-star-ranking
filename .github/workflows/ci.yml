@@ -1,0 +1,68 @@
+name: 🚦 CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: ${{ matrix.emoji }} ${{ matrix.label }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: format
+            emoji: 🎨
+            run: npm run format:check
+          - label: types
+            emoji: 🔬
+            run: npm run check
+          - label: tests
+            emoji: 🧪
+            run: npm test
+          - label: build
+            emoji: 🏗️
+            run: npm run build
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: ${{ matrix.run }}
+
+  summary:
+    name: 📋 summary
+    runs-on: ubuntu-latest
+    needs: [check]
+    if: always()
+    steps:
+      - name: Write the summary
+        env:
+          CHECKS: ${{ needs.check.result }}
+        run: |
+          case "$CHECKS" in
+            success) icon="✅ passed" ;;
+            skipped) icon="⏭️ skipped" ;;
+            cancelled) icon="🚫 cancelled" ;;
+            failure) icon="❌ failed" ;;
+            *) icon="❔ $CHECKS" ;;
+          esac
+          {
+            echo "| Job | Result |"
+            echo "| --- | --- |"
+            echo "| 🔍 checks | $icon |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          [ "$CHECKS" = "success" ]
