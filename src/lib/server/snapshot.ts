@@ -23,7 +23,7 @@ export interface RepoEntry extends OwnerEntry {
 
 export interface Meta {
   at: number;
-  boards: Record<Board, { total: number; pages: number }>;
+  boards: Record<Board, { total: number; pages: number; size?: number }>;
   languages: { name: string; slug: string; pages: number }[];
 }
 
@@ -54,7 +54,8 @@ async function board(name: Board, top: D1PreparedStatement, counts: D1PreparedSt
     `history/${name}/${date}`,
     ranked.map(({ id }) => id)
   );
-  return { total: spread.total, pages: await publish(`board/${name}`, ranked, PAGE_SIZE[name]) };
+  const size = PAGE_SIZE[name];
+  return { total: spread.total, pages: await publish(`board/${name}`, ranked, size), size };
 }
 
 async function languageBoards() {
@@ -124,11 +125,15 @@ export async function snapshot() {
   return meta;
 }
 
-/** On top of the cron's own slots: hourly while the first sweep is still filling the tables */
+/** A snapshot cut into pages of another size, say by an older deploy */
+export const outOfShape = (meta: Meta) =>
+  Object.entries(PAGE_SIZE).some(([board, size]) => meta.boards[board as Board].size !== size);
+
+/** On top of the cron's own slots: when the last one's out of shape, and hourly while the first sweep fills the tables */
 export async function filling() {
   const [meta, sweep] = await Promise.all([
     get<Meta>('meta'),
     readState<{ done?: number }>('sweep')
   ]);
-  return !meta || (!sweep?.done && Date.now() - meta.at > 3_600_000);
+  return !meta || outOfShape(meta) || (!sweep?.done && Date.now() - meta.at > 3_600_000);
 }
