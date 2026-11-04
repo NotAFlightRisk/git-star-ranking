@@ -17,7 +17,10 @@ export const handle: Handle = async ({ event, resolve }) => {
   event.locals.user = await readSession(event.cookies);
   const shared =
     event.request.method === 'GET' && !event.locals.user && !PERSONAL.test(event.url.pathname);
-  const response = shared ? await edge(event.url, () => resolve(event)) : await resolve(event);
+  // kit has already turned a data request's url into its page's, so key on what was asked
+  const response = shared
+    ? await edge(new URL(event.request.url), () => resolve(event))
+    : await resolve(event);
   if (!shared) response.headers.set('cache-control', 'private, no-store');
   waitUntil(flush());
   return response;
