@@ -137,6 +137,10 @@
       border: 1px solid var(--border-strong);
       border-radius: var(--radius);
       cursor: pointer;
+
+      &:hover {
+        background: var(--surface-hover);
+      }
     }
   }
 </style>
