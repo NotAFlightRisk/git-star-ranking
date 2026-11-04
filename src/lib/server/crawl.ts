@@ -14,6 +14,7 @@ import {
   type Resource
 } from './github.ts';
 import type { Grant } from './pool.ts';
+import { report } from './report.ts';
 import { meter } from './usage.ts';
 
 export interface Job {
@@ -112,15 +113,16 @@ async function refresh(batch: Awaited<ReturnType<typeof due>>, token: string, ta
   );
 }
 
+/** Works through the queue; true means it stopped early and the run should too */
 async function stream(queue: Awaited<ReturnType<typeof due>>[], deadline: number) {
   const take = borrow('graphql', 10);
   while (Date.now() < deadline) {
     const batch = queue.shift();
-    if (!batch) return;
+    if (!batch) return false;
     const { token, wait } = await take();
     if (!token) {
-      if (Date.now() + wait > deadline) return;
       queue.unshift(batch);
+      if (Date.now() + wait > deadline) return true;
       await sleep(wait);
       continue;
     }
@@ -128,18 +130,28 @@ async function stream(queue: Awaited<ReturnType<typeof due>>[], deadline: number
       await refresh(batch, token, take);
     } catch (error) {
       if (!(error instanceof GitHubError)) throw error;
-      if (!error.timedOut) return;
+      if (!error.timedOut) {
+        await report(error, undefined, 'crawl');
+        return true;
+      }
       if (batch.length === 1) await snooze([batch[0].id]);
       else queue.unshift(batch.slice(0, batch.length / 2), batch.slice(batch.length / 2));
     }
   }
+  return true;
 }
 
 /** The cron's share of work: refresh whoever's due, until the deadline */
 export async function refreshDue(deadline: number) {
   const { streams } = settings();
-  const queue = pack(await due(300 * streams));
-  await Promise.all(Array.from({ length: streams }, () => stream(queue, deadline)));
+  while (Date.now() < deadline) {
+    const queue = pack(await due(300 * streams));
+    if (!queue.length) return;
+    const stopped = await Promise.all(
+      Array.from({ length: streams }, () => stream(queue, deadline))
+    );
+    if (stopped.some(Boolean)) return;
+  }
 }
 
 export const searchQuery = ({ min, max, from, to }: Job) =>

@@ -48,10 +48,8 @@ interface QueueMessage<Body> {
   retry(options?: { delaySeconds?: number }): void;
 }
 
-interface ExportedHandler<Env, Body = unknown> {
-  fetch?(request: Request, env: Env, ctx: unknown): Response | Promise<Response>;
-  scheduled?(controller: { cron: string }, env: Env, ctx: unknown): Promise<void>;
-  queue?(batch: { messages: readonly QueueMessage<Body>[] }, env: Env, ctx: unknown): Promise<void>;
+interface ExportedHandler<Env> {
+  fetch(request: Request, env: Env, ctx: unknown): Response | Promise<Response>;
 }
 
 interface CacheStorage {

@@ -8,13 +8,11 @@ import { flush, meter } from '#lib/server/usage.ts';
 // signed in, or not the same for everyone
 const PERSONAL = /^\/(admin|login|logout|auth|api\/budget)(\/|$)/;
 
-const LOCAL = new Set(['localhost', '127.0.0.1']);
-
 export const handle: Handle = async ({ event, resolve }) => {
   meter('worker_requests');
-  const { url } = event;
-  if (url.protocol === 'http:' && !LOCAL.has(url.hostname)) {
-    return Response.redirect(url.href.replace('http:', 'https:'), 301);
+  // only Cloudflare's edge sets this, so local dev stays on plain http
+  if (event.request.headers.get('cf-visitor')?.includes('"http"')) {
+    return Response.redirect(event.url.href.replace('http:', 'https:'), 301);
   }
   event.locals.user = await readSession(event.cookies);
   const shared =

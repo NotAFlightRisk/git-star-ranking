@@ -11,9 +11,9 @@ const SNAPSHOT = '17 */6 * * *';
 const WORK_MS = 8 * 60_000;
 
 export default {
-  ...app,
+  fetch: app.fetch,
 
-  async scheduled(controller) {
+  async scheduled(controller: { cron: string }) {
     meter('worker_requests');
     try {
       if (controller.cron === SNAPSHOT) await snapshot();
@@ -30,7 +30,7 @@ export default {
     }
   },
 
-  async queue(batch) {
+  async queue(batch: { messages: readonly QueueMessage<Job>[] }) {
     meter('worker_requests');
     for (const message of batch.messages) {
       try {
@@ -44,4 +44,4 @@ export default {
     }
     await flush(true);
   }
-} satisfies ExportedHandler<Cloudflare.Env, Job>;
+};
