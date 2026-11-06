@@ -58,8 +58,13 @@ export const headers = (token: string) => ({
   'x-github-api-version': '2022-11-28'
 });
 
+// a hang or a half-sent answer is GitHub giving up, same as its own 504
+const hungUp = (error: Error): never => {
+  throw new GitHubError(504, error.message);
+};
+
 async function call(resource: Resource, url: string, init: RequestInit) {
-  const res = await fetch(url, { ...init, signal: AbortSignal.timeout(20_000) });
+  const res = await fetch(url, { ...init, signal: AbortSignal.timeout(20_000) }).catch(hungUp);
   const header = (name: string) => Number(res.headers.get(name) ?? NaN) || undefined;
   seen.push({
     resource,
@@ -69,8 +74,8 @@ async function call(resource: Resource, url: string, init: RequestInit) {
     reset: header('x-ratelimit-reset'),
     retryAfter: header('retry-after') ?? (res.status === 403 || res.status === 429 ? 60 : undefined)
   });
-  if (!res.ok) throw new GitHubError(res.status, await res.text());
-  return res.json();
+  if (!res.ok) throw new GitHubError(res.status, await res.text().catch(hungUp));
+  return res.json().catch(hungUp);
 }
 
 const WIDTHS = [
