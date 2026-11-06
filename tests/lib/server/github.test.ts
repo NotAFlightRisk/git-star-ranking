@@ -73,4 +73,13 @@ describe('viewer', () => {
     expect(query).not.toMatch(/on Organization/);
     vi.unstubAllGlobals();
   });
+
+  it.each([
+    ['hangs', () => Promise.reject(new DOMException('aborted due to timeout', 'TimeoutError'))],
+    ['cuts its answer short', async () => new Response('{"data": {"vie')]
+  ])('calls it a timeout when GitHub %s, so the crawl can split the batch', async (_, reply) => {
+    vi.stubGlobal('fetch', reply);
+    await expect(viewer('token')).rejects.toHaveProperty('timedOut', true);
+    vi.unstubAllGlobals();
+  });
 });
