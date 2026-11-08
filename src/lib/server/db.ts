@@ -216,11 +216,13 @@ export async function forget(id: number) {
   );
 }
 
-/** A prefix as an index-friendly range, as LIKE won't always use one */
-export const range = (prefix: string) =>
-  prefix
-    ? [prefix, prefix.slice(0, -1) + String.fromCharCode(prefix.charCodeAt(prefix.length - 1) + 1)]
+/** A lowercased prefix as an index-friendly range, as LIKE won't always use one */
+export const range = (prefix: string) => {
+  const low = prefix.toLowerCase();
+  return low
+    ? [low, low.slice(0, -1) + String.fromCharCode(low.charCodeAt(low.length - 1) + 1)]
     : ['', '￿'];
+};
 
 export async function search(query: string) {
   const scoped = query.includes('/');
