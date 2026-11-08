@@ -25,7 +25,10 @@ export async function edge(url: URL, render: () => Promise<Response>) {
   const age = hit ? Date.now() - Number(hit.headers.get('x-stored')) : Infinity;
   if (hit && age < FRESH) return restamp(hit, BROWSER);
   const fresh = render().then(async (response) => {
-    if (response.status !== 200 || response.headers.has('set-cookie')) return response;
+    if (response.status !== 200 || response.headers.has('set-cookie')) {
+      if (hit && response.status < 500) await cache.delete(key(url));
+      return response;
+    }
     await cache.put(key(url), restamp(response.clone(), KEEP, Date.now()));
     return restamp(response, BROWSER);
   });
