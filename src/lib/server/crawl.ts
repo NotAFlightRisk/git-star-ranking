@@ -228,6 +228,7 @@ export async function maybeSweep(now = Date.now()) {
   if (progress?.slices) {
     if (seconds() - progress.touched < STALLED) return;
     const stuck = await retouch(sweep!.id, 100);
+    if (!stuck.length) return writeState('sweep', { ...sweep!, done: now });
     meter('queue_ops', 3 * stuck.length);
     await env.CRAWL.sendBatch(stuck.map((body) => ({ body })));
     return;
