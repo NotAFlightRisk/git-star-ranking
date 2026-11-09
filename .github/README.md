@@ -58,6 +58,7 @@ To have Shields draw it, swap `badge.svg` for `shields` and pass that to their e
 ---
 
 ## Usage
+
 The following sections explain how this works, development setup, deployment instructions and configuration reference.
 
 ### How it works
@@ -97,7 +98,7 @@ npx wrangler secret put GITHUB_PRIVATE_KEY
 npm run deploy
 ```
 
-Or you can build from source: Grab the source from the [latest release](https://github.com/NotAFlightRisk/git-star-ranking/releases/latest) (or clone it), then follow the steps above. 
+Or you can build from source: Grab the source from the [latest release](https://github.com/NotAFlightRisk/git-star-ranking/releases/latest) (or clone it), then follow the steps above.
 
 ### Configuration
 
@@ -123,7 +124,7 @@ Settings, in `vars` in `wrangler.jsonc`:
 | `STREAMS`          | `2`                 | GraphQL queries the cron runs side by side                |
 | `ADMINS`           |                     | Comma-separated logins that can see `/admin`              |
 
-Snapshots go in the R2 bucket bound as `SNAPSHOTS`, so make one first with `npx wrangler r2 bucket create git-star-ranking-snapshots`. 
+Snapshots go in the R2 bucket bound as `SNAPSHOTS`, so make one first with `npx wrangler r2 bucket create git-star-ranking-snapshots`.
 If you drop the binding, they'll go into D1 instead.
 
 For optional hit counting and error reporting, you can set the `PUBLIC_PLAUSIBLE_SCRIPT` and `PUBLIC_SENTRY_DSN` vars, which the client reads at build time. Both are empty unless you set them, so nothing phones home.
