@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Language from '#lib/components/Language.svelte';
   import Seo from '#lib/components/Seo.svelte';
   import Star from '#lib/components/Star.svelte';
   import Updated from '#lib/components/Updated.svelte';
@@ -56,7 +57,7 @@
         <dt>Language</dt>
         <dd class="plain">
           <a href="/repositories?language={encodeURIComponent(repo.language.toLowerCase())}">
-            {repo.language}
+            <Language name={repo.language} />
           </a>
         </dd>
       </div>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { avatar, number, tidy } from '#lib/format.ts';
+  import Language from './Language.svelte';
   import Star from './Star.svelte';
 
   interface Row {
@@ -74,7 +75,11 @@
             <p class="description">{tidy(row.description)}</p>
           {/if}
         </td>
-        {#if language}<td class="language">{row.language ?? ''}</td>{/if}
+        {#if language}
+          <td class="language">
+            {#if row.language}<Language name={row.language} />{/if}
+          </td>
+        {/if}
         <td class="numeric"><Star /> {number(row.stars)}</td>
       </tr>
     {/each}

@@ -2,6 +2,7 @@
   import { page } from '$app/state';
   import type { ComponentProps } from 'svelte';
   import { BOARDS, number } from '#lib/format.ts';
+  import Language from './Language.svelte';
   import Pager from './Pager.svelte';
   import RankTable from './RankTable.svelte';
   import Seo from './Seo.svelte';
@@ -80,8 +81,10 @@
     {#each data.languages as language (language.slug)}
       <a
         href="/repositories?language={language.slug}"
-        aria-current={language.name === data.language ? 'page' : undefined}>{language.name}</a
+        aria-current={language.name === data.language ? 'page' : undefined}
       >
+        <Language name={language.name} />
+      </a>
     {/each}
   </nav>
 {/if}
