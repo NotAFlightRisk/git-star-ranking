@@ -34,6 +34,14 @@ export const day = (ms: number) => calendar.format(ms);
 export const month = (ms: number) => monthly.format(ms);
 export const iso = (ms: number) => new Date(ms).toISOString();
 
+/** A stretch of time in its biggest whole unit, like "40 minutes" or "3 days" */
+export function span(ms: number) {
+  const minutes = Math.max(Math.floor(ms / 60_000), 0);
+  if (minutes < 60) return count(minutes, 'minute');
+  const hours = Math.floor(minutes / 60);
+  return hours < 48 ? count(hours, 'hour') : count(Math.floor(hours / 24), 'day');
+}
+
 /** "top 0.4%" reads better than a long decimal, and nobody is in the top 0% */
 export const top = (share: number) => {
   const percent = share * 100;

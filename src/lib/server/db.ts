@@ -2,7 +2,7 @@ import { env } from 'cloudflare:workers';
 import { DAY, refreshDays, settings, STAR_TIERS } from './config.ts';
 import { searchQuery, type Job } from './sweep.ts';
 import type { Found, Kind, Owner, Repo } from './github.ts';
-import { meterD1 } from './usage.ts';
+import { meter, meterD1 } from './usage.ts';
 
 export interface OwnerRow {
   id: number;
@@ -197,8 +197,17 @@ export const due = (limit: number) =>
     )
   );
 
+/** When the longest-waiting account on a schedule fell due. New and hurried ones go first anyway */
+export const oldestDue = async () =>
+  (
+    await one<{ due_at: number }>(
+      sql('SELECT due_at FROM owners WHERE due_at > 0 AND hidden = 0 ORDER BY due_at LIMIT 1')
+    )
+  )?.due_at;
+
 /** Leaves an owner GitHub wouldn't give us for a day, so one bad account can't wedge the queue */
 export async function snooze(ids: number[], missed = false) {
+  meter('crawl_snoozed', ids.length);
   meterD1(
     await sql(
       `UPDATE owners SET due_at = ?2, missed = missed OR ?3

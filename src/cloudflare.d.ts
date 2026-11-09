@@ -2,7 +2,7 @@
 
 interface D1Result<T = unknown> {
   results: T[];
-  meta: { rows_read: number; rows_written: number; changes: number };
+  meta: { rows_read: number; rows_written: number; changes: number; size_after: number };
 }
 
 interface D1PreparedStatement {

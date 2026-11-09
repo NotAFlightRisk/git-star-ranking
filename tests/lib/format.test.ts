@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { boardPath, trend } from '../../src/lib/format.ts';
+import { boardPath, span, trend } from '../../src/lib/format.ts';
 
 describe('trend', () => {
   it('says which way an entry moved, and how far', () => {
@@ -24,5 +24,19 @@ describe('boardPath', () => {
       '/repositories?language=jupyter%20notebook&page=2'
     );
     expect(boardPath('/repositories', 1, 'C++')).toBe('/repositories?language=c%2B%2B');
+  });
+});
+
+describe('span', () => {
+  it('reads in its biggest whole unit', () => {
+    expect(span(30_000)).toBe('0 minutes');
+    expect(span(60_000)).toBe('1 minute');
+    expect(span(3 * 3_600_000 + 59 * 60_000)).toBe('3 hours');
+    expect(span(47 * 3_600_000)).toBe('47 hours');
+    expect(span(3 * 86_400_000)).toBe('3 days');
+  });
+
+  it('treats time already passed as none', () => {
+    expect(span(-5_000)).toBe('0 minutes');
   });
 });
