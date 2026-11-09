@@ -4,7 +4,7 @@
 <br />
 <img src="https://raw.githubusercontent.com/NotAFlightRisk/git-star-ranking/refs/heads/main/static/favicon.svg" width="48" />
 <br />
-<b>🌐 <a href="https://git-star-ranking.peng.ly/">git-star-ranking.peng.ly</a></b><br />
+<b>🌐 <a href="https://git-star-ranking.com/">git-star-ranking.com</a></b><br />
 </p>
 
 <details>
@@ -137,7 +137,7 @@ Inspired by the original [gitstar-ranking](https://github.com/k0kubun/gitstar-ra
 | [<img src="https://avatars.githubusercontent.com/u/5114666?s=32&v=4" width="16" alt="" /> @ryanmcdermott](https://github.com/ryanmcdermott) (98.5k ⭐) | [<img src="https://avatars.githubusercontent.com/u/158137808?s=32&v=4" width="16" alt="" /> @open-webui](https://github.com/open-webui) (176k ⭐) | [<img src="https://avatars.githubusercontent.com/u/207902832?s=32&v=4" width="16" alt="" /> pi](https://github.com/earendil-works/pi) (121k ⭐) |
 | [<img src="https://avatars.githubusercontent.com/u/1267200?s=32&v=4" width="16" alt="" /> @hacksider](https://github.com/hacksider) (97.9k ⭐) | [<img src="https://avatars.githubusercontent.com/u/54469796?s=32&v=4" width="16" alt="" /> @supabase](https://github.com/supabase) (175.2k ⭐) | [<img src="https://avatars.githubusercontent.com/u/192012301?s=32&v=4" width="16" alt="" /> browser-use](https://github.com/browser-use/browser-use) (120.3k ⭐) |
 | [<img src="https://avatars.githubusercontent.com/u/3095771?s=32&v=4" width="16" alt="" /> @ashishpatel26](https://github.com/ashishpatel26) (97.2k ⭐) | [<img src="https://avatars.githubusercontent.com/u/43716716?s=32&v=4" width="16" alt="" /> @doocs](https://github.com/doocs) (175k ⭐) | [<img src="https://avatars.githubusercontent.com/u/31833384?s=32&v=4" width="16" alt="" /> v2rayN](https://github.com/2dust/v2rayN) (120.3k ⭐) |
-| **[View full user leaderboard →](https://git-star-ranking.peng.ly/users)** | **[View full org leaderboard →](https://git-star-ranking.peng.ly/organizations)** | **[View full repo leaderboard →](https://git-star-ranking.peng.ly/repositories)** |
+| **[View full user leaderboard →](https://git-star-ranking.com/users)** | **[View full org leaderboard →](https://git-star-ranking.com/organizations)** | **[View full repo leaderboard →](https://git-star-ranking.com/repositories)** |
 
 <!-- leaderboard-end -->
 <!-- prettier-ignore-end -->
@@ -146,12 +146,12 @@ Inspired by the original [gitstar-ranking](https://github.com/k0kubun/gitstar-ra
 
 ## Badges
 
-You can use the interactive [badge builder](https://git-star-ranking.peng.ly/badge-builder) to make your own embedable badge for your readme, for any user, org or repo.
+You can use the interactive [badge builder](https://git-star-ranking.com/badge-builder) to make your own embedable badge for your readme, for any user, org or repo.
 Or write the URL yourself:
 
 ```markdown
-![git rank](https://git-star-ranking.peng.ly/users/<login>/badge.svg)
-![git rank](https://git-star-ranking.peng.ly/repositories/<owner>/<repo>/badge.svg)
+![git rank](https://git-star-ranking.com/users/<login>/badge.svg)
+![git rank](https://git-star-ranking.com/repositories/<owner>/<repo>/badge.svg)
 ```
 
 Add any of these to the query:
@@ -167,7 +167,7 @@ Add any of these to the query:
 To have Shields draw it, swap `badge.svg` for `shields` and pass that to their endpoint badge:
 
 ```markdown
-![git rank](https://img.shields.io/endpoint?url=https%3A%2F%2Fgit-star-ranking.peng.ly%2Fusers%2F<login>%2Fshields)
+![git rank](https://img.shields.io/endpoint?url=https%3A%2F%2Fgit-star-ranking.com%2Fusers%2F<login>%2Fshields)
 ```
 
 ---

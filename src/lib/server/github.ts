@@ -2,7 +2,7 @@ import { tidy } from '../format.ts';
 import { base64url } from './bytes.ts';
 
 export const API = 'https://api.github.com';
-export const AGENT = 'git-star-ranking (+https://git-star-ranking.peng.ly)';
+export const AGENT = 'git-star-ranking (+https://git-star-ranking.com)';
 
 export type Kind = 0 | 1;
 export type Resource = 'graphql' | 'search' | 'core';

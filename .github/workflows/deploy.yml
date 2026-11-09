@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: production
-      url: https://git-star-ranking.peng.ly
+      url: https://git-star-ranking.com
     steps:
       - name: Check there's somewhere to deploy to
         id: ready

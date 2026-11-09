@@ -48,7 +48,7 @@ describe('appJwt', () => {
 });
 
 describe('safeNext', () => {
-  const site = new URL('https://git-star-ranking.peng.ly/login?next=x');
+  const site = new URL('https://git-star-ranking.com/login?next=x');
 
   it('keeps a page on this site, query and all', () => {
     expect(safeNext('/users?page=2', site)).toBe('/users?page=2');
