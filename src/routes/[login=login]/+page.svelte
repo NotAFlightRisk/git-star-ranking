@@ -96,7 +96,14 @@
   </section>
 
   {#if data.rank && data.spread}
-    <Spread {owner} rank={data.rank} {...data.spread} />
+    <Spread
+      name={owner.login}
+      avatarId={owner.id}
+      stars={owner.stars}
+      {noun}
+      rank={data.rank}
+      {...data.spread}
+    />
   {/if}
 
   {#if data.repos.length}

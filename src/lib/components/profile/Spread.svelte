@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { avatar, number, short, top } from '#lib/format.ts';
+  import type { Snippet } from 'svelte';
+  import { avatar, count, number, short, top } from '#lib/format.ts';
 
   interface Band {
     from: number;
@@ -8,21 +9,24 @@
   }
 
   interface Props {
-    owner: { id: number; login: string; kind: number; stars: number };
+    name: string;
+    avatarId: number;
+    stars: number;
+    noun: string;
     rank: { rank: number; top: number; of: number };
     bands: Band[];
     marks: { share: number; stars: number }[];
+    controls?: Snippet;
   }
 
-  const { owner, rank, bands, marks }: Props = $props();
-  const noun = $derived(owner.kind ? 'organizations' : 'users');
+  const { name, avatarId, stars, noun, rank, bands, marks, controls }: Props = $props();
   const most = $derived(Math.max(...bands.map(({ count }) => count)));
-  const place = (stars: number) =>
+  const place = (value: number) =>
     Math.max(
-      bands.findLastIndex(({ from }) => from <= stars),
+      bands.findLastIndex(({ from }) => from <= value),
       0
     );
-  const mine = $derived(place(owner.stars));
+  const mine = $derived(place(stars));
   let hovered = $state<number>();
   const shown = $derived(bands[hovered ?? mine]);
 
@@ -30,12 +34,17 @@
   const height = (count: number) =>
     count ? Math.max((Math.log10(count + 1) / Math.log10(most + 1)) * 100, 3) : 0;
 
-  const across = (stars: number) => {
-    const i = place(stars);
+  const across = (value: number) => {
+    const i = place(value);
     const { from, to } = bands[i];
-    const within = Math.min(Math.max(Math.log(stars / from) / Math.log(to / from), 0), 1);
+    const within = Math.min(Math.max(Math.log(value / from) / Math.log(to / from), 0), 1);
     return ((i + within) / bands.length) * 100;
   };
+
+  const summary = $derived(
+    `${count(rank.of, noun)} by stars, on a log scale. ` +
+      `${name} is #${number(rank.rank)}, in the ${top(rank.top)}.`
+  );
 
   const decades = $derived(
     bands.flatMap((band, i) => (/^10*$/.test(String(band.from)) ? [{ i, from: band.from }] : []))
@@ -44,20 +53,16 @@
 
 <figure>
   <figcaption>
-    <h2>Among {number(rank.of)} {noun}</h2>
+    <div class="head">
+      <h2>Among {count(rank.of, noun)}</h2>
+      {@render controls?.()}
+    </div>
     <p>
       <strong>{short(shown.from)}–{short(shown.to)} stars:</strong>
-      {number(shown.count)}
-      {shown.count === 1 ? noun.slice(0, -1) : noun}{#if shown === bands[mine]}, including {owner.login}{/if}
+      {count(shown.count, noun)}{#if shown === bands[mine]}, including {name}{/if}
     </p>
   </figcaption>
-  <div
-    class="plot"
-    role="img"
-    aria-label="{number(rank.of)} {noun} by stars, on a log scale. {owner.login} is #{number(
-      rank.rank
-    )}, in the {top(rank.top)}."
-  >
+  <div class="plot" role="img" aria-label={summary}>
     {#each marks as mark, i (mark.share)}
       {@const x = across(mark.stars)}
       <span class="mark" class:low={i % 2} class:end={x > 80} style:left="{x}%">
@@ -77,7 +82,7 @@
       {/each}
       <img
         class="pin"
-        src={avatar(owner.id, 48)}
+        src={avatar(avatarId, 48)}
         alt=""
         width="24"
         height="24"
@@ -91,7 +96,7 @@
       <span class:first={!i} style:left="{(i / bands.length) * 100}%">{short(from)}</span>
     {/each}
   </div>
-  <p class="scale">Stars along the bottom, and accounts in each band on a log scale</p>
+  <p class="scale">Stars along the bottom, and {noun}s in each band on a log scale</p>
 </figure>
 
 <style>
@@ -107,6 +112,14 @@
 
     h2 {
       font-size: var(--text-xl);
+    }
+
+    .head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-2) var(--space-4);
     }
 
     p {

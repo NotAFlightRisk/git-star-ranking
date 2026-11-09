@@ -3,17 +3,25 @@
   import Layout from '#lib/components/profile/Layout.svelte';
   import Neighbours from '#lib/components/profile/Neighbours.svelte';
   import Schedule from '#lib/components/profile/Schedule.svelte';
+  import Spread from '#lib/components/profile/Spread.svelte';
   import Tile from '#lib/components/profile/Tile.svelte';
   import Tiles from '#lib/components/profile/Tiles.svelte';
   import Siblings from '#lib/components/repo/Siblings.svelte';
   import Seo from '#lib/components/Seo.svelte';
+  import Toggle from '#lib/components/Toggle.svelte';
   import { boardPath, month, number, percent, tidy, top } from '#lib/format.ts';
 
   const { data } = $props();
-  const { owner, repo, rank, language, siblings } = $derived(data);
+  const { owner, repo, rank, spread, language, siblings } = $derived(data);
   const full = $derived(`${owner.login}/${repo.name}`);
   const counted = $derived(owner.refreshed_at > 0);
   const share = $derived(owner.stars ? Math.min(repo.stars / owner.stars, 1) : 0);
+  let scope = $state<'all' | 'language'>('all');
+  const among = $derived(
+    scope === 'language' && language
+      ? { noun: `${language.name} repo`, ...language }
+      : rank && spread && { noun: 'repo', rank, spread }
+  );
   const schema = $derived({
     '@context': 'https://schema.org',
     '@type': 'SoftwareSourceCode',
@@ -58,6 +66,19 @@
   {/if}
 {/snippet}
 
+{#snippet scopes()}
+  {#if language}
+    <Toggle
+      label="Compare with"
+      options={[
+        { value: 'all', label: 'All repos' },
+        { value: 'language', label: language.name }
+      ]}
+      bind:value={scope}
+    />
+  {/if}
+{/snippet}
+
 {#snippet footer()}
   {#if data.schedule}<Schedule counted={owner.refreshed_at * 1000} {...data.schedule} />{/if}
 {/snippet}
@@ -85,6 +106,18 @@
       </Tile>
     {/if}
   </Tiles>
+
+  {#if among}
+    <Spread
+      name={repo.name}
+      avatarId={owner.id}
+      stars={repo.stars}
+      noun={among.noun}
+      rank={among.rank}
+      {...among.spread}
+      controls={scopes}
+    />
+  {/if}
 </Layout>
 
 <style>
