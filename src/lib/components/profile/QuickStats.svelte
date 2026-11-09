@@ -1,6 +1,5 @@
 <script lang="ts">
   import { count, number, percent, short } from '#lib/format.ts';
-  import Language from '../Language.svelte';
 
   interface Props {
     owner: { login: string; stars: number; repos: number };
@@ -16,7 +15,6 @@
   const tracked = $derived(sum('repos'));
   const smaller = $derived(Math.max(owner.stars - sum('stars'), 0));
   const best = $derived(repos[0]);
-  const main = $derived(languages.find((row) => row.language));
   const popular = $derived(tiers.filter((tier) => tier.repos).slice(-2));
   const share = (stars: number) => percent(owner.stars ? stars / owner.stars : 0);
 </script>
@@ -63,15 +61,6 @@
           <a href="/{owner.login}/{best.name}">{best.name}</a>,
           {#if best.rank}#{number(best.rank)} of all repos,{/if}
           {share(best.stars)} of stars
-        </dd>
-      </div>
-    {/if}
-    {#if main?.language}
-      <div>
-        <dt>Top language</dt>
-        <dd>
-          <strong><Language name={main.language} /></strong>, {share(main.stars)} of stars across
-          {count(main.repos, 'repo')}
         </dd>
       </div>
     {/if}

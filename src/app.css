@@ -17,6 +17,10 @@
   --star: #c48a00;
   --danger: #b42318;
   --selection: #cfe0fa;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-other: #8c959f;
 
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -55,6 +59,10 @@
     --star: #e3b341;
     --danger: #ff8a80;
     --selection: #1f3a5f;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-other: #6e7681;
   }
 }
 

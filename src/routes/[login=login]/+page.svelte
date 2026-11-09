@@ -3,8 +3,10 @@
   import Badges from '#lib/components/profile/Badges.svelte';
   import Forget from '#lib/components/profile/Forget.svelte';
   import Neighbours from '#lib/components/profile/Neighbours.svelte';
+  import Portfolio from '#lib/components/profile/Portfolio.svelte';
   import QuickStats from '#lib/components/profile/QuickStats.svelte';
   import Schedule from '#lib/components/profile/Schedule.svelte';
+  import Spread from '#lib/components/profile/Spread.svelte';
   import Stats from '#lib/components/profile/Stats.svelte';
   import RankTable from '#lib/components/RankTable.svelte';
   import Seo from '#lib/components/Seo.svelte';
@@ -73,6 +75,14 @@
         <p class="note">None yet. Forks don't count, and smaller repos still add to the total.</p>
       {/if}
     </section>
+
+    {#if data.rank && data.spread}
+      <Spread {owner} rank={data.rank} {...data.spread} />
+    {/if}
+
+    {#if data.repos.length}
+      <Portfolio {owner} repos={data.repos} languages={data.languages} />
+    {/if}
 
     <QuickStats
       {owner}
@@ -147,9 +157,10 @@
 
   .main {
     grid-area: main;
+    container-type: inline-size;
     display: grid;
     align-content: start;
-    gap: var(--space-6);
+    gap: var(--space-7);
     min-width: 0;
   }
 
