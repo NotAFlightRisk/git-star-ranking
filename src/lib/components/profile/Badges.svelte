@@ -1,29 +1,27 @@
 <script lang="ts">
   import { page } from '$app/state';
+  import { badgeUrl, builderPath, defaultLabel, FORMATS } from '#lib/badges.ts';
+  import { pathOf } from '#lib/names.ts';
   import Copy from '../Copy.svelte';
 
-  interface Props {
-    name: string;
-    path: string;
-    badges: string;
-  }
-
-  const { name, path, badges }: Props = $props();
-  const profile = $derived(`${page.url.origin}${path}`);
-  const badge = $derived(`${page.url.origin}${badges}/badge.svg`);
-  const shields = $derived(
-    `https://img.shields.io/endpoint?url=${encodeURIComponent(`${page.url.origin}${badges}/shields`)}`
+  const { login, repo }: { login: string; repo?: string } = $props();
+  const target = $derived({ login, repo });
+  const alt = defaultLabel('rank');
+  const markdown = $derived(
+    FORMATS.markdown.write(
+      badgeUrl(page.url.origin, target),
+      alt,
+      `${page.url.origin}${pathOf(target)}`
+    )
   );
 </script>
 
 <section aria-labelledby="badge">
   <h2 id="badge">Badge</h2>
-  <img src="{badges}/badge.svg" alt="git rank badge for {name}" height="20" />
-  <p>Markdown for a README, with our badge or a Shields one you can restyle.</p>
-  <h3>Ours</h3>
-  <Copy text="[![git rank]({badge})]({profile})" label="our badge's Markdown" />
-  <h3>Shields</h3>
-  <Copy text="[![git rank]({shields})]({profile})" label="the Shields badge's Markdown" />
+  <img src={badgeUrl('', target)} alt="{alt} badge for {pathOf(target).slice(1)}" height="20" />
+  <p>Put this rank in a README with the Markdown below.</p>
+  <Copy text={markdown} label="the badge's Markdown" />
+  <a href={builderPath(target)}>Customise it in the badge builder</a>
 </section>
 
 <style>
@@ -38,13 +36,11 @@
   }
 
   p,
-  h3 {
-    color: var(--text-muted);
+  a {
     font-size: var(--text-sm);
   }
 
-  h3 {
-    margin-block-start: var(--space-2);
-    font-weight: 600;
+  p {
+    color: var(--text-muted);
   }
 </style>

@@ -33,7 +33,7 @@
     min-width: 0;
     padding: var(--space-2) var(--space-3);
     font-size: var(--text-xs);
-    white-space: nowrap;
+    white-space: pre;
     overflow-x: auto;
     scrollbar-width: thin;
   }

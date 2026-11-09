@@ -55,7 +55,7 @@
 
 {#snippet aside()}
   {#if counted}
-    <Badges name={owner.login} path="/{owner.login}" badges="/users/{owner.login}" />
+    <Badges login={owner.login} />
   {/if}
   {#if data.neighbours}
     <Neighbours board={owner.kind ? 'organizations' : 'users'} {...data.neighbours} me={owner.id} />

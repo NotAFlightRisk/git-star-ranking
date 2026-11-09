@@ -1,3 +1,3 @@
-import { badge, repoRank } from '#lib/server/badge.ts';
+import { badge } from '#lib/server/badge.ts';
 
-export const GET = async ({ params }) => badge(await repoRank(params.login, params.repo));
+export const GET = ({ params, url }) => badge(url, params.login, params.repo);

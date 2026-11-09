@@ -63,7 +63,7 @@
 {/snippet}
 
 {#snippet aside()}
-  {#if rank}<Badges name={full} path="/{full}" badges="/repositories/{full}" />{/if}
+  {#if rank}<Badges login={owner.login} repo={repo.name} />{/if}
   {#if data.neighbours}
     <Neighbours board="repositories" {...data.neighbours} me={repo.id} />
   {/if}

@@ -9,7 +9,7 @@ const xml = (path: string) => path.replaceAll('&', '&amp;');
 /** Every board page, then one sitemap per board for the profiles and repos on it */
 export async function paths(name: (typeof SITEMAPS)[number]) {
   const meta = await readMeta();
-  if (!meta) return ['/', '/about'];
+  if (!meta) return ['/', '/about', '/badge-builder'];
   if (name === 'pages') {
     const pages = (path: string, count: number) =>
       Array.from({ length: count }, (_, i) =>
@@ -18,6 +18,7 @@ export async function paths(name: (typeof SITEMAPS)[number]) {
     return [
       '/',
       '/about',
+      '/badge-builder',
       ...BOARDS.flatMap((board) => pages(board.path, meta.boards[board.key].pages)),
       ...meta.languages.flatMap((language) =>
         pages(`/repositories?language=${language.slug}`, language.pages)

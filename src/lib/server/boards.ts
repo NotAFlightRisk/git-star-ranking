@@ -67,9 +67,9 @@ export const position = (histogram: Histogram, stars: number) => ({
   of: histogram.total
 });
 
-/** Rank and percentile for a star count, as of the last snapshot */
-export async function standing(board: Board, stars: number) {
-  const histogram = await spread(board);
+/** Rank and percentile for a star count on a board, as of the last snapshot */
+export async function standing(key: string, stars: number) {
+  const histogram = await spread(key);
   return histogram && stars > 0 ? position(histogram, stars) : undefined;
 }
 

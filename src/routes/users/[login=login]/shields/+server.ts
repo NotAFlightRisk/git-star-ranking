@@ -1,3 +1,3 @@
-import { ownerRank, shields } from '#lib/server/badge.ts';
+import { shields } from '#lib/server/badge.ts';
 
-export const GET = async ({ params }) => shields(await ownerRank(params.login));
+export const GET = ({ params, url }) => shields(url, params.login);

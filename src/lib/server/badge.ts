@@ -1,52 +1,114 @@
 import { json } from '@sveltejs/kit';
-import { number } from '../format.ts';
-import { standing } from './boards.ts';
-import { findOwner, findRepo } from './db.ts';
+import {
+  BLUE,
+  defaultLabel,
+  GREY,
+  hex,
+  LABEL_GREY,
+  readBadge,
+  type BadgeOptions,
+  type Show
+} from '../badges.ts';
+import { number, short, top } from '../format.ts';
+import { logo, render, type Drawn } from './badge-svg.ts';
+import { languageListing, readMeta, standing } from './boards.ts';
+import { findOwner, findRepo, type RepoRow } from './db.ts';
 
-const LABEL = 'git rank';
+type Place = Awaited<ReturnType<typeof standing>>;
 
-// near enough for Verdana at 11px, which is what every flat badge uses
-const width = (text: string) => Math.round(text.length * 6.6) + 12;
-
-/** An owner's rank on its board, if it has one */
-export async function ownerRank(login: string) {
-  const owner = await findOwner(login);
-  const board = owner?.kind ? 'organizations' : 'users';
-  return owner ? (await standing(board, owner.stars))?.rank : undefined;
+/** What a badge can say about an account or repo */
+export interface Facts {
+  stars: number;
+  rank?: Place;
+  language?: string | null;
+  inLanguage?: Place;
 }
 
-/** A repo's rank among every repo, if it has one */
-export async function repoRank(login: string, name: string) {
+async function ownerFacts(login: string): Promise<Facts | undefined> {
+  const owner = await findOwner(login);
+  if (!owner) return undefined;
+  // until its first count, an account only has the stars a search turned up
+  const counted = owner.refreshed_at > 0;
+  const board = owner.kind ? 'organizations' : 'users';
+  return { stars: owner.stars, rank: counted ? await standing(board, owner.stars) : undefined };
+}
+
+async function languageRank({ language, stars }: RepoRow) {
+  const latest = await readMeta();
+  const board = latest && languageListing(latest, language);
+  return board ? standing(board.key, stars) : undefined;
+}
+
+async function repoFacts(login: string, name: string, show: Show): Promise<Facts | undefined> {
   const owner = await findOwner(login);
   const repo = owner && (await findRepo(owner.id, name));
-  return repo ? (await standing('repositories', repo.stars))?.rank : undefined;
+  if (!repo) return undefined;
+  const [rank, inLanguage] = await Promise.all([
+    standing('repositories', repo.stars),
+    show === 'language' ? languageRank(repo) : undefined
+  ]);
+  return { stars: repo.stars, rank, language: repo.language, inLanguage };
 }
 
-/** Our own flat badge, in the same shape as everyone else's */
-export function badge(rank?: number) {
-  const value = rank ? `#${number(rank)}` : 'unranked';
-  const [left, right] = [width(LABEL), width(value)];
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${left + right}" height="20" role="img" aria-label="${LABEL}: ${value}">
-  <title>${LABEL}: ${value}</title>
-  <clipPath id="ends"><rect width="${left + right}" height="20" rx="3"/></clipPath>
-  <g clip-path="url(#ends)">
-    <rect width="${left}" height="20" fill="#555"/>
-    <rect x="${left}" width="${right}" height="20" fill="${rank ? '#0b5cc4' : '#6e7781'}"/>
-  </g>
-  <g fill="#fff" font-family="Verdana,DejaVu Sans,sans-serif" font-size="11" text-anchor="middle">
-    <text x="${left / 2}" y="14">${LABEL}</text>
-    <text x="${left + right / 2}" y="14">${value}</text>
-  </g>
-</svg>`;
-  return new Response(svg, { headers: { 'content-type': 'image/svg+xml; charset=utf-8' } });
+const VALUES: Record<Show, (facts: Facts) => string | undefined> = {
+  rank: ({ rank }) => rank && `#${number(rank.rank)}`,
+  language: ({ inLanguage, language }) =>
+    inLanguage && `#${number(inLanguage.rank)} in ${language}`,
+  top: ({ rank }) => rank && top(rank.top),
+  stars: ({ stars }) => short(stars)
+};
+
+const valueOf = (facts: Facts | undefined, show: Show) => facts && VALUES[show](facts);
+
+/** What a badge says and looks like. Missing values are always grey */
+export function draw(facts: Facts | undefined, options: BadgeOptions): Drawn {
+  const value = valueOf(facts, options.show);
+  return {
+    label: options.label ?? defaultLabel(options.show),
+    message: value ?? (facts ? 'unranked' : 'not found'),
+    color: hex(value ? (options.color ?? BLUE) : GREY),
+    labelColor: hex(options.labelColor ?? LABEL_GREY),
+    style: options.style,
+    icon: Boolean(options.icon)
+  };
 }
 
-/** The shape shields.io's endpoint badge reads, as the original served it */
-export const shields = (rank?: number) =>
-  json({
-    schemaVersion: 1,
-    label: LABEL,
-    message: rank ? String(rank) : 'unranked',
-    color: rank ? 'brightgreen' : 'lightgrey',
-    cacheSeconds: 3600
-  });
+async function describe(url: URL, login: string, repo?: string) {
+  const options = readBadge(url.searchParams, repo ? 'repo' : 'account');
+  const facts = repo ? await repoFacts(login, repo, options.show) : await ownerFacts(login);
+  // read on every README view, and a rank only moves when a snapshot lands,
+  // though a badge with nothing to show may have something after the next count
+  const seconds = valueOf(facts, options.show) ? 3600 : 300;
+  const headers = { 'x-browser-cache': `public, max-age=${seconds}` };
+  return { drawn: draw(facts, options), seconds, headers };
+}
+
+const SVG = {
+  'content-type': 'image/svg+xml; charset=utf-8',
+  // labels come from the URL, so nothing in one may run if opened directly
+  'content-security-policy': "default-src 'none'",
+  'x-content-type-options': 'nosniff'
+};
+
+/** Our own badge for an account, or for one of its repos */
+export async function badge(url: URL, login: string, repo?: string) {
+  const { drawn, headers } = await describe(url, login, repo);
+  return new Response(render(drawn), { headers: { ...SVG, ...headers } });
+}
+
+/** The same badge as Shields' endpoint reads it, for them to draw */
+export const endpoint = (drawn: Drawn, cacheSeconds = 3600) => ({
+  schemaVersion: 1,
+  label: drawn.label,
+  message: drawn.message,
+  color: drawn.color,
+  labelColor: drawn.labelColor,
+  style: drawn.style,
+  logoSvg: drawn.icon ? logo(drawn) : undefined,
+  cacheSeconds
+});
+
+export async function shields(url: URL, login: string, repo?: string) {
+  const { drawn, seconds, headers } = await describe(url, login, repo);
+  return json(endpoint(drawn, seconds), { headers });
+}

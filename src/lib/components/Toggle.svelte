@@ -1,7 +1,7 @@
 <script lang="ts" generics="T extends string">
   interface Props {
     label: string;
-    options: { value: T; label: string }[];
+    options: { value: T; label: string; title?: string }[];
     value: T;
   }
 
@@ -12,7 +12,7 @@
 <fieldset>
   <legend class="visually-hidden">{label}</legend>
   {#each options as option (option.value)}
-    <label>
+    <label title={option.title}>
       <input type="radio" {name} value={option.value} bind:group={value} />
       {option.label}
     </label>
@@ -22,6 +22,7 @@
 <style>
   fieldset {
     display: inline-flex;
+    flex-wrap: wrap;
     margin: 0;
     padding: 2px;
     border: 1px solid var(--border);
