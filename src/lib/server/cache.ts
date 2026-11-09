@@ -4,6 +4,11 @@ import { waitUntil } from 'cloudflare:workers';
 const FRESH = 10 * 60_000;
 const KEEP = 'public, max-age=86400';
 const BROWSER = 'public, max-age=60';
+// badges are fetched from every README view, and a rank only moves when a snapshot lands
+const BADGE = 'public, max-age=3600';
+const BADGES = /^\/(users|repositories)\/.+\/(badge\.svg|shields)$/;
+
+const browser = (url: URL) => (BADGES.test(url.pathname) ? BADGE : BROWSER);
 
 const gone = (status: number) =>
   status === 404 || status === 410 || (status >= 300 && status < 400);
@@ -26,16 +31,16 @@ export async function edge(url: URL, render: () => Promise<Response>) {
   const cache = caches.default;
   const hit = await cache.match(key(url));
   const age = hit ? Date.now() - Number(hit.headers.get('x-stored')) : Infinity;
-  if (hit && age < FRESH) return restamp(hit, BROWSER);
+  if (hit && age < FRESH) return restamp(hit, browser(url));
   const fresh = render().then(async (response) => {
     if (response.status !== 200 || response.headers.has('set-cookie')) {
       if (hit && gone(response.status)) await cache.delete(key(url));
       return response;
     }
     await cache.put(key(url), restamp(response.clone(), KEEP, Date.now()));
-    return restamp(response, BROWSER);
+    return restamp(response, browser(url));
   });
   if (!hit) return fresh;
   waitUntil(fresh);
-  return restamp(hit, BROWSER);
+  return restamp(hit, browser(url));
 }
