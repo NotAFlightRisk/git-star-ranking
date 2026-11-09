@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:workers';
-import { DAY, refreshDays, settings } from './config.ts';
+import { DAY, refreshDays, settings, STAR_TIERS } from './config.ts';
 import { searchQuery, type Job } from './sweep.ts';
 import type { Found, Kind, Owner } from './github.ts';
 import { meterD1 } from './usage.ts';
@@ -219,11 +219,9 @@ export interface LanguageRow {
   stars: number;
 }
 
-const TIERS = [100, 1_000, 10_000, 100_000];
-
 /** An owner's top repos, all of them totted up by language, and how many clear each star tier */
 export async function portfolio(ownerId: number) {
-  const over = TIERS.map((least, i) => `SUM(stars >= ${least}) AS t${i}`).join(', ');
+  const over = STAR_TIERS.map((least, i) => `SUM(stars >= ${least}) AS t${i}`).join(', ');
   const [repos, languages, tiers] = meterD1(
     await env.DB.batch([
       sql(
@@ -243,7 +241,7 @@ export async function portfolio(ownerId: number) {
   return {
     repos: repos.results as RepoRow[],
     languages: languages.results as LanguageRow[],
-    tiers: TIERS.map((least, i) => ({ least, repos: counts[`t${i}`] ?? 0 }))
+    tiers: STAR_TIERS.map((least, i) => ({ least, repos: counts[`t${i}`] ?? 0 }))
   };
 }
 
@@ -256,6 +254,32 @@ export const findRepo = (ownerId: number, name: string) =>
       name
     )
   );
+
+/** A repo among its owner's others: their top few, how many there are, and its place */
+export async function siblings(repo: RepoRow, count = 5) {
+  const [top, tally] = meterD1(
+    await env.DB.batch([
+      sql(
+        `SELECT id, name, stars, language FROM repos WHERE owner_id = ?
+         ORDER BY stars DESC, id LIMIT ?`,
+        repo.owner_id,
+        count + 1
+      ),
+      sql(
+        'SELECT COUNT(*) AS repos, SUM(stars > ?2) AS above FROM repos WHERE owner_id = ?1',
+        repo.owner_id,
+        repo.stars
+      )
+    ])
+  );
+  const { repos, above } = tally.results[0] as { repos: number; above: number | null };
+  const rows = top.results as Pick<RepoRow, 'id' | 'name' | 'stars' | 'language'>[];
+  return {
+    rows: rows.filter(({ id }) => id !== repo.id).slice(0, count),
+    place: (above ?? 0) + 1,
+    of: repos
+  };
+}
 
 /** Hides an account for good, and leaves a tombstone so a crawl can't bring it back */
 export async function forget(id: number) {

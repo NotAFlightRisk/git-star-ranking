@@ -60,15 +60,33 @@ async function board(name: Board, top: D1PreparedStatement, counts: D1PreparedSt
   return { total: spread.total, pages: await publish(`board/${name}`, ranked, size), size };
 }
 
+interface Tally {
+  language: string;
+  stars: number;
+  n: number;
+}
+
+/** Each language's histogram, from a tally sorted by language then stars, biggest first */
+export function byLanguage(tally: Tally[]) {
+  const groups = new Map<string, Tally[]>();
+  for (const row of tally) {
+    const group = groups.get(row.language);
+    if (group) group.push(row);
+    else groups.set(row.language, [row]);
+  }
+  return [...groups]
+    .map(([name, counts]) => ({ name, histogram: histogram(counts) }))
+    .sort((a, b) => b.histogram.total - a.histogram.total || a.name.localeCompare(b.name));
+}
+
 async function languageBoards() {
-  const { results: languages } = meterD1(
+  const { results } = meterD1(
     await env.DB.prepare(
-      `SELECT language AS name, COUNT(*) AS n FROM repos WHERE language IS NOT NULL
-       GROUP BY language ORDER BY n DESC LIMIT ?1`
-    )
-      .bind(LANGUAGES)
-      .all<{ name: string }>()
+      `SELECT language, stars, COUNT(*) AS n FROM repos WHERE language IS NOT NULL
+       GROUP BY language, stars ORDER BY language, stars DESC`
+    ).all<Tally>()
   );
+  const languages = byLanguage(results).slice(0, LANGUAGES);
   if (!languages.length) return [];
   const tops = meterD1(
     await env.DB.batch(
@@ -79,6 +97,9 @@ async function languageBoards() {
         ).bind(name, LANGUAGE_PAGES * PAGE_SIZE.repositories)
       )
     )
+  );
+  await putAll(
+    languages.map(({ name, histogram }) => [`hist/repositories/${slug(name)}`, histogram])
   );
   return Promise.all(
     languages.map(async ({ name }, i) => ({

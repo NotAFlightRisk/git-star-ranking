@@ -55,9 +55,9 @@ export async function boardLoad(board: Board, url: URL) {
 }
 
 /** A board's rank histogram from the last snapshot, if it has anyone in it */
-export async function spread(board: Board) {
+export async function spread(key: string) {
   const latest = await readMeta();
-  const histogram = latest && (await cached<Histogram>(`hist/${board}`, latest.at));
+  const histogram = latest && (await cached<Histogram>(`hist/${key}`, latest.at));
   return histogram?.total ? histogram : undefined;
 }
 
@@ -81,11 +81,29 @@ export function around<T extends { id: number }>(rows: T[], id: number, count = 
   return rows.slice(start, start + count);
 }
 
-/** Who sits near an owner on its board, for those in the top pages */
-export async function neighbours(board: 'users' | 'organizations', id: number, rank: number) {
-  const latest = await readMeta();
-  const page = Math.ceil(rank / (latest?.boards[board].size ?? PAGE_SIZE[board]));
-  if (!latest || page > latest.boards[board].pages) return undefined;
-  const rows = around((await entries<OwnerEntry>(board, page)).rows, id);
+export interface Listing {
+  key: string;
+  size: number;
+  pages: number;
+}
+
+/** Where a board's pages are in this snapshot */
+export function listing(latest: Meta, board: Board): Listing {
+  const { pages, size = PAGE_SIZE[board] } = latest.boards[board];
+  return { key: board, size, pages };
+}
+
+/** Where one language's repo pages are, if it's big enough to have them */
+export function languageListing(latest: Meta, language: string | null): Listing | undefined {
+  const cut = latest.languages.find(({ name }) => name === language);
+  const { size } = listing(latest, 'repositories');
+  return cut && { key: `repositories/${cut.slug}`, size, pages: cut.pages };
+}
+
+/** Who sits near an entry on its board, for those in the pages we keep */
+export async function neighbours<T extends OwnerEntry>(board: Listing, id: number, rank: number) {
+  const page = Math.ceil(rank / board.size);
+  if (page > board.pages) return undefined;
+  const rows = around((await entries<T>(board.key, page)).rows, id);
   return rows && { page, rows };
 }

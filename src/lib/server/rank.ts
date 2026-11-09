@@ -33,6 +33,9 @@ const place = (stars: number[], count: number) => first(stars.length, (i) => sta
 export const rankOf = ({ stars, above, total }: Histogram, count: number) =>
   1 + (above[place(stars, count)] ?? total);
 
+/** How many sit at this count or above */
+export const atLeast = (histogram: Histogram, count: number) => rankOf(histogram, count - 1) - 1;
+
 /** The next count up from this one, and the rank it would bring */
 export function nextUp({ stars, above }: Histogram, count: number) {
   const at = place(stars, count);
@@ -66,12 +69,20 @@ export function bands(histogram: Histogram) {
   for (let scale = 1; !edges.length || edges.at(-1)! <= most; scale *= 10) {
     edges.push(...STEPS.map((step) => Math.round(step * scale)));
   }
-  const atLeast = (stars: number) => rankOf(histogram, stars - 1) - 1;
+  const between = (from: number, to: number) => atLeast(histogram, from) - atLeast(histogram, to);
   return edges
     .slice(0, -1)
-    .map((from, i) => ({ from, to: edges[i + 1], count: atLeast(from) - atLeast(edges[i + 1]) }))
+    .map((from, i) => ({ from, to: edges[i + 1], count: between(from, edges[i + 1]) }))
     .filter(({ from, to }) => to > least && from <= most);
 }
+
+const SHARES = [0.5, 0.1, 0.01, 0.001];
+
+/** Where "top 50%" and the like start, leaving out any too fine for a board this size */
+export const marks = (histogram: Histogram) =>
+  SHARES.filter((share) => share * histogram.total >= 1)
+    .map((share) => ({ share, stars: starsFor(histogram, share) }))
+    .filter((mark, i, all) => mark.stars !== all[i - 1]?.stars);
 
 /** Ranks a list that's already sorted most stars first, the same way */
 export function competition<T extends { stars: number }>(rows: T[]) {

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  atLeast,
   bands,
   competition,
   histogram,
+  marks,
   milestone,
   nextUp,
   percentile,
@@ -43,6 +45,15 @@ describe('percentile', () => {
   it('never goes past everyone', () => {
     expect(percentile(spread, 1)).toBe(1);
     expect(percentile(histogram([]), 10)).toBe(1);
+  });
+});
+
+describe('atLeast', () => {
+  it('counts everyone at or above a count, ties and all', () => {
+    expect([900, 500, 400, 100, 50].map((stars) => atLeast(spread, stars))).toEqual([
+      1, 3, 3, 6, 6
+    ]);
+    expect(atLeast(spread, 1_000)).toBe(0);
   });
 });
 
@@ -109,5 +120,22 @@ describe('milestone', () => {
     expect(milestone(board, 1_000)).toBeUndefined();
     expect(milestone(spread, 100)).toEqual({ percent: 60, stars: 500 });
     expect(milestone(spread, 900)).toBeUndefined();
+  });
+});
+
+describe('marks', () => {
+  it('leaves out shares finer than one account', () => {
+    expect(marks(spread)).toEqual([{ share: 0.5, stars: 500 }]);
+  });
+
+  it('keeps one mark where two shares start at the same count', () => {
+    const lumpy = histogram([
+      { stars: 1_000, n: 20 },
+      { stars: 1, n: 980 }
+    ]);
+    expect(marks(lumpy)).toEqual([
+      { share: 0.5, stars: 1 },
+      { share: 0.01, stars: 1_000 }
+    ]);
   });
 });
