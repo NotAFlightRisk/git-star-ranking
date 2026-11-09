@@ -31,6 +31,9 @@ describe('saving a refresh', () => {
     language: 'Go',
     description: null,
     created: 1_300_000_000,
+    forks: 5,
+    license: 'MIT',
+    archived: false,
     ...more
   });
   const owner = (id: number, list: Repo[], more: Partial<Owner> = {}): Owner => ({
@@ -75,6 +78,25 @@ describe('saving a refresh', () => {
         created_at: 1.3e9
       },
       { id: 12, name: 'repo-12', stars: 70, language: 'Go', description: null, created_at: 1.3e9 }
+    ]);
+  });
+
+  it('only writes forks along with stars, or to fill them in', async () => {
+    const forks = () => table('SELECT forks FROM repos').map((row) => row.forks);
+    await saveOwners([owner(1, [repo(10, 100, { forks: null })])]);
+    await saveOwners([owner(1, [repo(10, 100, { forks: 6 })])]);
+    expect(forks()).toEqual([6]);
+    await saveOwners([owner(1, [repo(10, 100, { forks: 7 })])]);
+    expect(forks()).toEqual([6]);
+    await saveOwners([owner(1, [repo(10, 101, { forks: 8 })])]);
+    expect(forks()).toEqual([8]);
+  });
+
+  it('keeps up with licences and archiving', async () => {
+    await saveOwners([owner(1, [repo(10, 100)])]);
+    await saveOwners([owner(1, [repo(10, 100, { license: 'Apache-2.0', archived: true })])]);
+    expect(table('SELECT license, archived FROM repos')).toEqual([
+      { license: 'Apache-2.0', archived: 1 }
     ]);
   });
 

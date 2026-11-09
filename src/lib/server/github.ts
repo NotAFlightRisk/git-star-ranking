@@ -21,6 +21,9 @@ export interface Repo {
   language: string | null;
   description: string | null;
   created: number | null;
+  forks: number | null;
+  license: string | null;
+  archived: boolean | null;
 }
 
 export interface Owner {
@@ -111,7 +114,8 @@ const repositories = (
   orderBy: { field: STARGAZERS, direction: DESC }) {
   totalCount
   pageInfo { hasNextPage endCursor }
-  nodes { databaseId name stargazerCount description primaryLanguage { name } createdAt }
+  nodes { databaseId name stargazerCount description primaryLanguage { name } createdAt
+    forkCount isArchived licenseInfo { spdxId } }
 }`;
 
 const PERSON = 'databaseId name createdAt followers { totalCount }';
@@ -128,6 +132,9 @@ interface RawRepo {
   description: string | null;
   primaryLanguage: { name: string } | null;
   createdAt?: string;
+  forkCount?: number;
+  isArchived?: boolean;
+  licenseInfo?: { spdxId: string | null } | null;
 }
 
 interface RawOwner {
@@ -150,13 +157,19 @@ export const short = (text: string | null) => tidy(text);
 
 const epoch = (iso?: string | null) => (iso ? Math.floor(Date.parse(iso) / 1000) : null);
 
+// GitHub's word for a licence file it can't match to a known one
+const licence = (spdx?: string | null) => (spdx === 'NOASSERTION' ? 'Other' : (spdx ?? null));
+
 const toRepo = (raw: RawRepo): Repo => ({
   id: raw.databaseId,
   name: raw.name,
   stars: raw.stargazerCount,
   language: raw.primaryLanguage?.name ?? null,
   description: short(raw.description),
-  created: epoch(raw.createdAt)
+  created: epoch(raw.createdAt),
+  forks: raw.forkCount ?? null,
+  license: licence(raw.licenseInfo?.spdxId),
+  archived: raw.isArchived ?? null
 });
 
 const toOwner = (raw: RawOwner): Owner => ({
@@ -240,6 +253,9 @@ interface RawFound {
   language: string | null;
   description: string | null;
   created_at: string;
+  forks_count: number;
+  license: { spdx_id: string | null } | null;
+  archived: boolean;
   owner: { id: number; login: string; type: string };
 }
 
@@ -258,6 +274,9 @@ export async function searchRepos(token: string, q: string, page: number) {
       language: raw.language,
       description: short(raw.description),
       created: epoch(raw.created_at),
+      forks: raw.forks_count,
+      license: licence(raw.license?.spdx_id),
+      archived: raw.archived,
       owner: { id: raw.owner.id, login: raw.owner.login, kind: raw.owner.type === 'User' ? 0 : 1 }
     }));
   return { total: body.total_count, incomplete: body.incomplete_results, items };

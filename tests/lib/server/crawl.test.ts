@@ -43,7 +43,19 @@ describe('finish', () => {
     name: null,
     followers: null,
     joined: null,
-    list: [{ id: id * 10, name: 'a', stars: 100, language: null, description: null, created: 1 }],
+    list: [
+      {
+        id: id * 10,
+        name: 'a',
+        stars: 100,
+        language: null,
+        description: null,
+        created: 1,
+        forks: 0,
+        license: null,
+        archived: false
+      }
+    ],
     cursor: 'page2'
   });
   const done: Owner = { ...big(3), cursor: undefined };

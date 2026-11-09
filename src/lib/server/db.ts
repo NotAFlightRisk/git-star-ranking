@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { DAY, refreshDays, settings, STAR_TIERS } from './config.ts';
 import { searchQuery, type Job } from './sweep.ts';
-import type { Found, Kind, Owner } from './github.ts';
+import type { Found, Kind, Owner, Repo } from './github.ts';
 import { meterD1 } from './usage.ts';
 
 export interface OwnerRow {
@@ -28,31 +28,59 @@ export interface RepoRow {
   created_at: number | null;
 }
 
+/** The extras only a repo's own page shows */
+export interface RepoDetails extends RepoRow {
+  forks: number | null;
+  license: string | null;
+  archived: number | null;
+}
+
 export const seconds = () => Math.floor(Date.now() / 1000);
 
 const each = (column: number) => `json_extract(value, '$[${column}]')`;
 
-// each repo the crawl hands over, in this order, unless its owner has asked to be left out
-const REPO = ['id', 'owner_id', 'name', 'stars', 'language', 'description', 'created_at'];
+const DETAILS = ['description', 'created_at', 'license', 'archived'];
+const REPO = ['id', 'owner_id', 'name', 'stars', 'language', ...DETAILS, 'forks'];
+
+/** A repo as REPO lists its columns, for the writes below */
+const repoRow = (repo: Repo, ownerId: number) => [
+  repo.id,
+  ownerId,
+  repo.name,
+  repo.stars,
+  repo.language,
+  repo.description,
+  repo.created,
+  repo.license,
+  repo.archived,
+  repo.forks
+];
+
+// each incoming repo, unless its owner has asked to be left out
 const INCOMING = `(SELECT ${REPO.map((column, i) => `${each(i)} AS ${column}`).join(', ')}
   FROM json_each(?1) WHERE NOT EXISTS (SELECT 1 FROM owners WHERE id = ${each(1)} AND hidden = 1)
 ) AS new`;
 
+const changed = (columns: string[]) =>
+  columns.map((column) => `repos.${column} IS NOT new.${column} COLLATE BINARY`).join(' OR ');
+
 // D1 bills a row for each index a SET touches, changed or not, so columns go in index groups
-function updateRepos(columns: string[]) {
+function updateRepos(columns: string[], when = changed(columns)) {
   const set = columns.map((column) => `${column} = new.${column}`);
-  const changed = columns.map((column) => `repos.${column} IS NOT new.${column} COLLATE BINARY`);
   return `UPDATE repos SET ${set.join(', ')} FROM ${INCOMING}
-    WHERE repos.id = new.id AND (${changed.join(' OR ')})`;
+    WHERE repos.id = new.id AND (${when})`;
 }
 
-/** New repos, then only what changed: stars most days, the rest hardly ever */
+/** New repos, then only what changed. Forks move most days, so they ride along with other writes */
 const REPO_WRITES = [
   `INSERT INTO repos (${REPO.join(', ')}) SELECT * FROM ${INCOMING} WHERE true
    ON CONFLICT (id) DO NOTHING`,
-  updateRepos(['stars']),
+  updateRepos(['stars', 'forks'], changed(['stars'])),
   updateRepos(['owner_id', 'name', 'language']),
-  updateRepos(['description', 'created_at'])
+  updateRepos(
+    [...DETAILS, 'forks'],
+    `${changed(DETAILS)} OR (repos.forks IS NULL AND new.forks IS NOT NULL)`
+  )
 ];
 
 const UPSERT_OWNERS = `
@@ -125,17 +153,7 @@ export async function saveOwners(fetched: Owner[], gone: number[] = []) {
     ];
   });
   const repos = fetched.flatMap((owner) =>
-    owner.list
-      .filter((repo) => repo.stars >= minStars)
-      .map((repo) => [
-        repo.id,
-        owner.id,
-        repo.name,
-        repo.stars,
-        repo.language,
-        repo.description,
-        repo.created
-      ])
+    owner.list.filter((repo) => repo.stars >= minStars).map((repo) => repoRow(repo, owner.id))
   );
   const complete = fetched.filter((owner) => !owner.cursor).map((owner) => owner.id);
   const json = JSON.stringify(owners);
@@ -160,15 +178,7 @@ export async function saveFound(found: Found[]) {
     row[3] += stars;
     owners.set(owner.id, row);
   }
-  const repos = found.map((repo) => [
-    repo.id,
-    repo.owner.id,
-    repo.name,
-    repo.stars,
-    repo.language,
-    repo.description,
-    repo.created
-  ]);
+  const repos = found.map((repo) => repoRow(repo, repo.owner.id));
   meterD1(
     await env.DB.batch([
       sql(STUB_OWNERS, JSON.stringify([...owners.values()])),
@@ -270,10 +280,10 @@ export async function portfolio(ownerId: number) {
 }
 
 export const findRepo = (ownerId: number, name: string) =>
-  one<RepoRow>(
+  one<RepoDetails>(
     sql(
-      `SELECT id, owner_id, name, stars, language, description, created_at FROM repos
-       WHERE owner_id = ? AND name = ? LIMIT 1`,
+      `SELECT id, owner_id, name, stars, language, description, created_at, forks, license,
+       archived FROM repos WHERE owner_id = ? AND name = ? LIMIT 1`,
       ownerId,
       name
     )

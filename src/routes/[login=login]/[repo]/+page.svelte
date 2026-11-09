@@ -11,7 +11,7 @@
   import Siblings from '#lib/components/repo/Siblings.svelte';
   import Seo from '#lib/components/Seo.svelte';
   import Toggle from '#lib/components/Toggle.svelte';
-  import { boardPath, month, number, percent, tidy, top } from '#lib/format.ts';
+  import { boardPath, count, month, number, percent, tidy, top } from '#lib/format.ts';
 
   const { data } = $props();
   const { owner, repo, rank, spread, language, siblings } = $derived(data);
@@ -48,12 +48,15 @@
   <h1><a href="/{owner.login}">{owner.login}</a>/<wbr />{repo.name}</h1>
   {#if repo.description}<p class="description">{tidy(repo.description)}</p>{/if}
   <p class="dotted">
+    {#if repo.archived}<span class="archived">Archived</span>{/if}
     {#if owner.name}<span>by <a href="/{owner.login}">{owner.name}</a></span>{/if}
     {#if repo.language}
       <span>
         <a href={boardPath('/repositories', 1, repo.language)}><Language name={repo.language} /></a>
       </span>
     {/if}
+    {#if repo.license}<span>{repo.license} licence</span>{/if}
+    {#if repo.forks !== null}<span>{count(repo.forks, 'fork')}</span>{/if}
     {#if repo.created_at}<span>Created {month(repo.created_at * 1000)}</span>{/if}
     <span><a href="https://github.com/{full}" rel="external">View on GitHub</a></span>
   </p>
@@ -139,6 +142,15 @@
     &:hover {
       text-decoration: underline;
     }
+  }
+
+  .archived {
+    padding-inline: var(--space-2);
+    border: 1px solid var(--border-strong);
+    border-radius: 2em;
+    color: var(--text);
+    font-size: var(--text-xs);
+    font-weight: 600;
   }
 
   .description {
