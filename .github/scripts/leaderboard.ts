@@ -13,16 +13,18 @@ const README = new URL('../README.md', import.meta.url);
 const { homepage } = JSON.parse(
   await readFile(new URL('../../package.json', import.meta.url), 'utf8')
 );
-const api = process.env.LEADERBOARD_API || `${homepage}/api/leaderboard`;
+const api = new URL(process.env.LEADERBOARD_API || `${homepage}/api/leaderboard`);
+// the edge hands out its stale copy while it refreshes, so ask for today's
+api.searchParams.set('day', new Date().toISOString().slice(0, 10));
 
 const isId = (n: unknown): n is number => Number.isSafeInteger(n) && (n as number) > 0;
-const isStars = (n: unknown): n is number => Number.isFinite(n) && (n as number) >= 0;
+const isStars = (n: unknown): n is number => Number.isSafeInteger(n) && (n as number) >= 0;
 const named = (text: unknown, pattern: RegExp): text is string =>
   typeof text === 'string' && pattern.test(text);
 const fit = (text: string) => (text.length > MOST ? `${text.slice(0, MOST - 1)}…` : text);
 
 const cell = (id: number, label: string, href: string, stars: number) =>
-  `[<img src="${avatar(id, 32)}" width="16" /> ${fit(label)}](${href}) (${short(stars)} ⭐)`;
+  `[<img src="${avatar(id, 32)}" width="16" alt="" /> ${fit(label)}](${href}) (${short(stars)} ⭐)`;
 
 const owner = ({ id, login, stars }: Row) =>
   isId(id) && named(login, LOGIN) && isStars(stars)

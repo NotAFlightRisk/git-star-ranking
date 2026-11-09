@@ -10,6 +10,7 @@ async function top(latest: Meta, board: Board) {
   const lists = await Promise.all(
     Array.from({ length: wanted }, (_, page) => entries(key, page + 1))
   );
+  if (lists.some(({ rows }) => !rows.length)) error(503, `The ${board} snapshot is missing a page`);
   return lists.flatMap(({ rows }) => rows).slice(0, TOP);
 }
 
