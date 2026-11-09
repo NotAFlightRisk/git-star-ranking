@@ -1,5 +1,6 @@
 <script lang="ts">
   import Language from '#lib/components/Language.svelte';
+  import Badges from '#lib/components/profile/Badges.svelte';
   import Layout from '#lib/components/profile/Layout.svelte';
   import Neighbours from '#lib/components/profile/Neighbours.svelte';
   import Schedule from '#lib/components/profile/Schedule.svelte';
@@ -59,6 +60,7 @@
 {/snippet}
 
 {#snippet aside()}
+  {#if rank}<Badges name={full} path="/{full}" badges="/repositories/{full}" />{/if}
   {#if data.neighbours}
     <Neighbours board="repositories" {...data.neighbours} me={repo.id} />
   {/if}
@@ -87,7 +89,7 @@
 <Layout
   avatarId={owner.id}
   {title}
-  aside={data.neighbours || siblings.rows.length ? aside : undefined}
+  aside={rank || data.neighbours || siblings.rows.length ? aside : undefined}
   footer={data.schedule ? footer : undefined}
 >
   <Tiles>

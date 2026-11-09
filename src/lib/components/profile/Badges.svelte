@@ -2,17 +2,23 @@
   import { page } from '$app/state';
   import Copy from '../Copy.svelte';
 
-  const { login }: { login: string } = $props();
-  const profile = $derived(`${page.url.origin}/${login}`);
-  const badge = $derived(`${page.url.origin}/users/${login}/badge.svg`);
+  interface Props {
+    name: string;
+    path: string;
+    badges: string;
+  }
+
+  const { name, path, badges }: Props = $props();
+  const profile = $derived(`${page.url.origin}${path}`);
+  const badge = $derived(`${page.url.origin}${badges}/badge.svg`);
   const shields = $derived(
-    `https://img.shields.io/endpoint?url=${encodeURIComponent(`${page.url.origin}/users/${login}/shields`)}`
+    `https://img.shields.io/endpoint?url=${encodeURIComponent(`${page.url.origin}${badges}/shields`)}`
   );
 </script>
 
 <section aria-labelledby="badge">
   <h2 id="badge">Badge</h2>
-  <img src={badge} alt="git rank badge for {login}" height="20" />
+  <img src="{badges}/badge.svg" alt="git rank badge for {name}" height="20" />
   <p>Markdown for a README, with our badge or a Shields one you can restyle.</p>
   <h3>Ours</h3>
   <Copy text="[![git rank]({badge})]({profile})" label="our badge's Markdown" />
