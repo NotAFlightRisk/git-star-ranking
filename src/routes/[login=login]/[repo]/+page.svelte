@@ -6,6 +6,7 @@
   import Spread from '#lib/components/profile/Spread.svelte';
   import Tile from '#lib/components/profile/Tile.svelte';
   import Tiles from '#lib/components/profile/Tiles.svelte';
+  import QuickStats from '#lib/components/repo/QuickStats.svelte';
   import Siblings from '#lib/components/repo/Siblings.svelte';
   import Seo from '#lib/components/Seo.svelte';
   import Toggle from '#lib/components/Toggle.svelte';
@@ -118,6 +119,14 @@
       controls={scopes}
     />
   {/if}
+
+  <QuickStats
+    {repo}
+    next={data.next}
+    milestone={data.milestone}
+    club={data.club}
+    yearly={data.yearly}
+  />
 </Layout>
 
 <style>

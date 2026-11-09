@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { histogram } from '../../../src/lib/server/rank.ts';
-import { club } from '../../../src/lib/server/repo.ts';
+import { club, yearly } from '../../../src/lib/server/repo.ts';
 
 const board = histogram([
   { stars: 20_000, n: 1 },
@@ -20,5 +20,19 @@ describe('club', () => {
 
   it('leaves out repos short of the first tier', () => {
     expect(club(board, 90)).toBeUndefined();
+  });
+});
+
+describe('yearly', () => {
+  const year = 365.25 * 86_400;
+  const made = 1_300_000_000;
+
+  it('averages stars over the years since a repo was made', () => {
+    expect(yearly({ stars: 1_000, created_at: made }, made + 4 * year)).toBe(250);
+  });
+
+  it('waits a year, and needs to know when it was made', () => {
+    expect(yearly({ stars: 1_000, created_at: made }, made + year / 2)).toBeUndefined();
+    expect(yearly({ stars: 1_000, created_at: null }, made + 4 * year)).toBeUndefined();
   });
 });

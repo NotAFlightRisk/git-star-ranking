@@ -1,5 +1,8 @@
 <script lang="ts">
-  import { count, number, percent, short } from '#lib/format.ts';
+  import { number, percent, short } from '#lib/format.ts';
+  import Climb from './Climb.svelte';
+  import Fact from './Fact.svelte';
+  import Facts from './Facts.svelte';
 
   interface Props {
     owner: { login: string; stars: number; repos: number };
@@ -19,108 +22,29 @@
   const share = (stars: number) => percent(owner.stars ? stars / owner.stars : 0);
 </script>
 
-<section aria-labelledby="quick">
-  <h2 id="quick">Quick stats</h2>
-  <dl>
-    {#if next}
-      <div>
-        <dt>Next rank</dt>
-        <dd>
-          <strong>+{number(next.stars - owner.stars)}</strong> stars to reach #{number(next.rank)}
-        </dd>
-      </div>
-    {/if}
-    {#if milestone}
-      <div>
-        <dt>Next milestone</dt>
-        <dd>
-          <strong>+{number(milestone.stars - owner.stars)}</strong> stars to reach the top
-          {milestone.percent}%
-        </dd>
-      </div>
-    {/if}
-    <div>
-      <dt>Public repos</dt>
-      <dd><strong>{number(owner.repos)}</strong>, {number(tracked)} with 50+ stars</dd>
-    </div>
-    {#if popular.length}
-      <div>
-        <dt>Popular repos</dt>
-        <dd>
-          {#each popular as tier, i (tier.least)}
-            {i ? ', ' : ''}<strong>{number(tier.repos)}</strong> over
-            {short(tier.least).toLowerCase()} stars
-          {/each}
-        </dd>
-      </div>
-    {/if}
-    {#if best}
-      <div>
-        <dt>Top repo</dt>
-        <dd>
-          <a href="/{owner.login}/{best.name}">{best.name}</a>,
-          {#if best.rank}#{number(best.rank)} of all repos,{/if}
-          {share(best.stars)} of stars
-        </dd>
-      </div>
-    {/if}
-    {#if smaller}
-      <div>
-        <dt>Smaller repos</dt>
-        <dd><strong>{number(smaller)}</strong> stars from repos under 50</dd>
-      </div>
-    {/if}
-  </dl>
-</section>
-
-<style>
-  section {
-    display: grid;
-    gap: var(--space-3);
-  }
-
-  h2 {
-    font-size: var(--text-xl);
-  }
-
-  dl {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
-    column-gap: var(--space-6);
-    margin: 0;
-    font-size: var(--text-sm);
-
-    > div {
-      display: grid;
-      grid-template-columns: 7rem minmax(0, 1fr);
-      gap: var(--space-3);
-      padding-block: var(--space-2);
-      border-block-end: 1px solid var(--border);
-    }
-  }
-
-  dt {
-    color: var(--text-muted);
-  }
-
-  dd {
-    margin: 0;
-    color: var(--text-muted);
-    overflow-wrap: anywhere;
-  }
-
-  strong,
-  a {
-    color: var(--text);
-    font-weight: 600;
-  }
-
-  a {
-    text-decoration: none;
-
-    &:hover {
-      color: var(--accent);
-      text-decoration: underline;
-    }
-  }
-</style>
+<Facts>
+  <Climb stars={owner.stars} {next} {milestone} />
+  <Fact label="Public repos">
+    <strong>{number(owner.repos)}</strong>, {number(tracked)} with 50+ stars
+  </Fact>
+  {#if popular.length}
+    <Fact label="Popular repos">
+      {#each popular as tier, i (tier.least)}
+        {i ? ', ' : ''}<strong>{number(tier.repos)}</strong> over
+        {short(tier.least).toLowerCase()} stars
+      {/each}
+    </Fact>
+  {/if}
+  {#if best}
+    <Fact label="Top repo">
+      <a href="/{owner.login}/{best.name}">{best.name}</a>,
+      {#if best.rank}#{number(best.rank)} of all repos,{/if}
+      {share(best.stars)} of stars
+    </Fact>
+  {/if}
+  {#if smaller}
+    <Fact label="Smaller repos">
+      <strong>{number(smaller)}</strong> stars from repos under 50
+    </Fact>
+  {/if}
+</Facts>
