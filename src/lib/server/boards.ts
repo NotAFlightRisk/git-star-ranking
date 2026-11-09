@@ -54,15 +54,37 @@ export async function boardLoad(board: Board, url: URL) {
   };
 }
 
-/** Rank and percentile for a star count, as of the last snapshot */
-export async function standing(board: Board, stars: number) {
+/** A board's rank histogram from the last snapshot, if it has anyone in it */
+export async function spread(board: Board) {
   const latest = await readMeta();
   const histogram = latest && (await cached<Histogram>(`hist/${board}`, latest.at));
-  if (!latest || !histogram?.total || stars <= 0) return undefined;
-  return {
-    rank: rankOf(histogram, stars),
-    top: percentile(histogram, stars),
-    of: histogram.total,
-    at: latest.at
-  };
+  return histogram?.total ? histogram : undefined;
+}
+
+export const position = (histogram: Histogram, stars: number) => ({
+  rank: rankOf(histogram, stars),
+  top: percentile(histogram, stars),
+  of: histogram.total
+});
+
+/** Rank and percentile for a star count, as of the last snapshot */
+export async function standing(board: Board, stars: number) {
+  const histogram = await spread(board);
+  return histogram && stars > 0 ? position(histogram, stars) : undefined;
+}
+
+/** A few rows either side of this one, shifted along rather than cut off at the ends */
+export function around<T extends { id: number }>(rows: T[], id: number, count = 5) {
+  const at = rows.findIndex((row) => row.id === id);
+  if (at < 0) return undefined;
+  const start = Math.max(0, Math.min(at - (count >> 1), rows.length - count));
+  return rows.slice(start, start + count);
+}
+
+/** Who sits near an owner on its board, for those in the top pages */
+export async function neighbours(board: 'users' | 'organizations', id: number, rank: number) {
+  const latest = await readMeta();
+  const page = Math.ceil(rank / (latest?.boards[board].size ?? PAGE_SIZE[board]));
+  if (!latest || page > latest.boards[board].pages) return undefined;
+  return around((await entries<OwnerEntry>(board, page)).rows, id);
 }

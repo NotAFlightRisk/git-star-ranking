@@ -185,14 +185,30 @@ export const findOwner = (login: string) =>
     )
   );
 
-export const ownerRepos = (ownerId: number) =>
-  many<RepoRow>(
-    sql(
-      `SELECT id, owner_id, name, stars, language, description FROM repos
-       WHERE owner_id = ? ORDER BY stars DESC, id LIMIT 100`,
-      ownerId
-    )
+export interface LanguageRow {
+  language: string | null;
+  repos: number;
+  stars: number;
+}
+
+/** An owner's top repos, plus all of them totted up by language, in one trip */
+export async function portfolio(ownerId: number) {
+  const [repos, languages] = meterD1(
+    await env.DB.batch([
+      sql(
+        `SELECT id, owner_id, name, stars, language, description FROM repos
+         WHERE owner_id = ? ORDER BY stars DESC, id LIMIT 100`,
+        ownerId
+      ),
+      sql(
+        `SELECT language, COUNT(*) AS repos, SUM(stars) AS stars FROM repos
+         WHERE owner_id = ? GROUP BY language ORDER BY stars DESC`,
+        ownerId
+      )
+    ])
   );
+  return { repos: repos.results as RepoRow[], languages: languages.results as LanguageRow[] };
+}
 
 export const findRepo = (ownerId: number, name: string) =>
   one<RepoRow>(
