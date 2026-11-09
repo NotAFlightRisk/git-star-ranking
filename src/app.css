@@ -133,6 +133,28 @@ img {
   white-space: nowrap;
 }
 
+.button {
+  display: inline-block;
+  padding: var(--space-2) var(--space-4);
+  font: inherit;
+  font-weight: 600;
+  font-size: var(--text-sm);
+  color: var(--text);
+  text-decoration: none;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--surface-hover);
+  }
+
+  &.danger {
+    color: var(--danger);
+  }
+}
+
 .numeric {
   font-variant-numeric: tabular-nums;
   text-align: end;

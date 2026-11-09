@@ -45,6 +45,17 @@ export function starsFor({ stars, above, total }: Histogram, share: number) {
   return stars[first(stars.length, (i) => above[i] >= rank) - 1];
 }
 
+const GRADES = [90, 80, 70, 60, 50, 40, 30, 20, 10, 1, 0.1, 0.01, 0.001];
+
+/** The next "top X%" up from this count and where it starts, if the board's big enough for it */
+export function milestone(histogram: Histogram, count: number) {
+  const within = (percent: number) => Math.floor((percent / 100) * histogram.total);
+  const rank = rankOf(histogram, count);
+  const percent = GRADES.find((grade) => rank > within(grade));
+  if (!percent || within(percent) < 1) return undefined;
+  return { percent, stars: starsFor(histogram, percent / 100) };
+}
+
 const STEPS = [1, 1.6, 2.5, 4, 6.3];
 
 /** Accounts counted in even steps on a log scale: 1, 2, 3, 4, 6, 10, 16, 25, 40, 63, 100... */

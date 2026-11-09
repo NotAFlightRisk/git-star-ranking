@@ -10,9 +10,21 @@ const when = new Intl.DateTimeFormat('en-GB', {
   timeZoneName: 'short'
 });
 
+const calendar = new Intl.DateTimeFormat('en-GB', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  timeZone: 'UTC'
+});
+
 export const number = (n: number) => whole.format(n);
+export const count = (n: number, noun: string) => `${number(n)} ${noun}${n === 1 ? '' : 's'}`;
+/** A share as a whole percent, without rounding a sliver down to nothing */
+export const percent = (share: number) =>
+  share > 0 && share < 0.005 ? '<1%' : `${Math.round(share * 100)}%`;
 export const short = (n: number) => compact.format(n);
 export const date = (ms: number) => when.format(ms);
+export const day = (ms: number) => calendar.format(ms);
 export const iso = (ms: number) => new Date(ms).toISOString();
 
 /** "top 0.4%" reads better than a long decimal, and nobody is in the top 0% */

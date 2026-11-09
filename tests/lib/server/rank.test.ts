@@ -3,6 +3,7 @@ import {
   bands,
   competition,
   histogram,
+  milestone,
   nextUp,
   percentile,
   rankOf,
@@ -91,5 +92,22 @@ describe('bands', () => {
       [6, 10]
     ]);
     expect(bands(histogram([]))).toEqual([]);
+  });
+});
+
+describe('milestone', () => {
+  const board = histogram(Array.from({ length: 1_000 }, (_, i) => ({ stars: 1_000 - i, n: 1 })));
+
+  it('aims for the next tenth up, then each tenfold step past the top 10%', () => {
+    expect(milestone(board, 50)).toEqual({ percent: 90, stars: 101 });
+    expect(milestone(board, 850)).toEqual({ percent: 10, stars: 901 });
+    expect(milestone(board, 950)).toEqual({ percent: 1, stars: 991 });
+    expect(milestone(board, 995)).toEqual({ percent: 0.1, stars: 1_000 });
+  });
+
+  it('stops where the board is too small to have a finer step', () => {
+    expect(milestone(board, 1_000)).toBeUndefined();
+    expect(milestone(spread, 100)).toEqual({ percent: 60, stars: 500 });
+    expect(milestone(spread, 900)).toBeUndefined();
   });
 });

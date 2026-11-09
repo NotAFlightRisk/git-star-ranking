@@ -86,5 +86,6 @@ export async function neighbours(board: 'users' | 'organizations', id: number, r
   const latest = await readMeta();
   const page = Math.ceil(rank / (latest?.boards[board].size ?? PAGE_SIZE[board]));
   if (!latest || page > latest.boards[board].pages) return undefined;
-  return around((await entries<OwnerEntry>(board, page)).rows, id);
+  const rows = around((await entries<OwnerEntry>(board, page)).rows, id);
+  return rows && { page, rows };
 }

@@ -191,9 +191,12 @@ export interface LanguageRow {
   stars: number;
 }
 
-/** An owner's top repos, plus all of them totted up by language, in one trip */
+const TIERS = [100, 1_000, 10_000, 100_000];
+
+/** An owner's top repos, all of them totted up by language, and how many clear each star tier */
 export async function portfolio(ownerId: number) {
-  const [repos, languages] = meterD1(
+  const over = TIERS.map((least, i) => `SUM(stars >= ${least}) AS t${i}`).join(', ');
+  const [repos, languages, tiers] = meterD1(
     await env.DB.batch([
       sql(
         `SELECT id, owner_id, name, stars, language, description FROM repos
@@ -204,10 +207,16 @@ export async function portfolio(ownerId: number) {
         `SELECT language, COUNT(*) AS repos, SUM(stars) AS stars FROM repos
          WHERE owner_id = ? GROUP BY language ORDER BY stars DESC`,
         ownerId
-      )
+      ),
+      sql(`SELECT ${over} FROM repos WHERE owner_id = ?`, ownerId)
     ])
   );
-  return { repos: repos.results as RepoRow[], languages: languages.results as LanguageRow[] };
+  const counts = (tiers.results[0] ?? {}) as Record<string, number | null>;
+  return {
+    repos: repos.results as RepoRow[],
+    languages: languages.results as LanguageRow[],
+    tiers: TIERS.map((least, i) => ({ least, repos: counts[`t${i}`] ?? 0 }))
+  };
 }
 
 export const findRepo = (ownerId: number, name: string) =>
