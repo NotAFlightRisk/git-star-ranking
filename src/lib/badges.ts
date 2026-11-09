@@ -113,7 +113,7 @@ export const FORMATS: Record<Format, Embed> = {
   markdown: {
     label: 'Markdown',
     write: (image, alt, link) => {
-      const img = `![${alt.replace(/[[\]]/g, '\\$&')}](${image})`;
+      const img = `![${alt.replace(/[\\[\]]/g, '\\$&')}](${image})`;
       return link ? `[${img}](${link})` : img;
     }
   },
