@@ -2,6 +2,8 @@
 <p align="center">
 <i>GitHub star ranking for users, organizations and repositories</i>
 <br />
+<img src="https://raw.githubusercontent.com/NotAFlightRisk/git-star-ranking/refs/heads/main/static/favicon.svg" width="48" />
+<br />
 <b>🌐 <a href="https://git-star-ranking.peng.ly/">git-star-ranking.peng.ly</a></b><br />
 </p>
 
@@ -10,27 +12,27 @@
 
 - [About](#about)
 - [Badges](#badges)
-- [How it works](#how-it-works)
-- [Deployment](#deployment)
-- [Configuration](#configuration)
-- [Development](#development)
+- [Usage](#usage)
+  - [How it works](#how-it-works)
+  - [Deployment](#deployment)
+  - [Configuration](#configuration)
+  - [Development](#development)
 - [Credits](#credits)
 
 </details>
 
 ## About
 
-Where does an account sit on GitHub by stars? This ranks every user, organization and repo we can find, with the top 5,000 of each in paged tables, and a profile page for everyone else showing their rank and how near the top they are. It's a rebuild of [gitstar-ranking](https://github.com/k0kubun/gitstar-ranking), which shut down in November 2026, with the same layout and URLs (`/users`, `/organizations`, `/repositories`, `/:login`, `/:login/:repo`).
+An application which crawls GitHub, and ranks the top users, organisations and repositories based upon star count.
 
-An account's stars are the stars on every public repo it owns, added up. Forks don't count. Ties share a rank, so two accounts on the same count are both 7th and the next one is 9th. Accounts with over 1,000 repos get their 1,000 most starred counted.
-
-Sign in with GitHub and your page is counted on the spot. It asks for no permissions, uses the token once on your own public repos and hands it straight back. You can also remove yourself from there.
+Inspired by the original [gitstar-ranking](https://github.com/k0kubun/gitstar-ranking) by [@k0kubun](https://github.com/k0kubun).
 
 ---
 
 ## Badges
 
-The [badge builder](https://git-star-ranking.peng.ly/badge-builder) makes one for any account or repo. Or write the URL yourself:
+You can use the interactive [badge builder](https://git-star-ranking.peng.ly/badge-builder) to make your own embedable badge for your readme, for any user, org or repo.
+Or write the URL yourself:
 
 ```markdown
 ![git rank](https://git-star-ranking.peng.ly/users/<login>/badge.svg)
@@ -55,9 +57,15 @@ To have Shields draw it, swap `badge.svg` for `shields` and pass that to their e
 
 ---
 
-## How it works
+## Usage
 
-It's one Cloudflare Worker: a SvelteKit site, plus a cron, a queue consumer and a Durable Object, over D1. Everything's sized to stay inside the Workers Paid allowances and GitHub's limits.
+The following sections explain how this works, development setup, deployment instructions and configuration reference.
+
+### How it works
+
+It's one Cloudflare Worker: a SvelteKit site, plus a cron, a queue consumer and a Durable Object, over D1. All data comes from the GitHub API.
+
+<details>
 
 - Discovery is a search sweep, about weekly. Search only ever returns 1,000 results, so the sweep splits `stars:50..10000000` in half (geometrically, as stars follow a power law) until each slice is under 1,000, then splits single star counts by creation date, down to the second if it has to. Each slice is one queue message, ticked off in a `slices` table so a retried message can't count twice, and a sweep that goes quiet for an hour gets its missing slices sent round again. A full sweep of the ~850k repos with 50+ stars is around 3,500 messages, so well under 3% of the queue allowance a month.
 - Counting is batched GraphQL. Node ids are worked out from GitHub's numeric ids, so one `nodes(ids:)` query covers a whole batch for a point. GitHub's 10 second timeout bites long before the points do (it manages about 100 repos a second), so batches are packed to about 400 repos and halved if one times out.
@@ -68,37 +76,31 @@ It's one Cloudflare Worker: a SvelteKit site, plus a cron, a queue consumer and 
 - Pages are rendered on the Worker and cached per data centre for ten minutes, then served stale while they refresh.
 - `/admin` shows this month's usage against each allowance, and `/api/budget` answers 503 once anything passes 70%, which is what the uptime check watches.
 
----
+</details>
 
-## Deployment
+### Deployment
 
-### Option 1: Cloudflare Workers
-
-This is how the live site runs, and it's sized to fit inside Workers Paid. You'll also need a GitHub App of your own, with no permissions at all, the callback URL set to `https://<your domain>/auth/callback`, installed on your own account. Fork the repo, then:
+The site works best on Cloudflare, so you'll need a Cloudflare account with a Workers Pro plan. You'll also need a GitHub App without any permissions, and with the callback URL set to `https://<your domain>/auth/callback`, installed on your own account. Then fork the repo, and run:
 
 ```bash
+# 1. Setup
 npm install
 npx wrangler d1 create git-star-ranking
 npx wrangler queues create git-star-ranking-crawl
-```
 
-Pop the database id into `wrangler.jsonc`, and change `APP_URL`, `ADMINS` and `routes` to your own. Then create the tables, add the secrets (see [Configuration](#configuration)) and deploy:
+# 2. Configure
+# Pop the db ID into wrangler.jsonc, and set `APP_URL`, `ADMINS` and `routes`
+vi wrangler.jsonc
 
-```bash
+# 3. Deploy
 npx wrangler d1 migrations apply DB --remote
 npx wrangler secret put GITHUB_PRIVATE_KEY
 npm run deploy
 ```
 
-The first sweep starts on the next cron, and the tables start filling an hour or so later.
+Or you can build from source: Grab the source from the [latest release](https://github.com/NotAFlightRisk/git-star-ranking/releases/latest) (or clone it), then follow the steps above.
 
-### Option 2: From a release or from source
-
-Grab the source from the [latest release](https://github.com/NotAFlightRisk/git-star-ranking/releases/latest) (or clone it), then follow the steps above. There's no Docker image, as it leans on D1, Queues and Durable Objects throughout.
-
----
-
-## Configuration
+### Configuration
 
 Secrets, set with `npx wrangler secret put <name>` (or in `.dev.vars` locally):
 
@@ -122,13 +124,12 @@ Settings, in `vars` in `wrangler.jsonc`:
 | `STREAMS`          | `2`                 | GraphQL queries the cron runs side by side                |
 | `ADMINS`           |                     | Comma-separated logins that can see `/admin`              |
 
-Snapshots go in the R2 bucket bound as `SNAPSHOTS`, so make one first with `npx wrangler r2 bucket create git-star-ranking-snapshots`. Drop the binding and they go in D1 instead.
+Snapshots go in the R2 bucket bound as `SNAPSHOTS`, so make one first with `npx wrangler r2 bucket create git-star-ranking-snapshots`.
+If you drop the binding, they'll go into D1 instead.
 
-The client build reads `PUBLIC_PLAUSIBLE_SCRIPT` and `PUBLIC_SENTRY_DSN` at build time. Both are empty unless you set them, so nothing phones home.
+For optional hit counting and error reporting, you can set the `PUBLIC_PLAUSIBLE_SCRIPT` and `PUBLIC_SENTRY_DSN` vars, which the client reads at build time. Both are empty unless you set them, so nothing phones home.
 
----
-
-## Development
+### Development
 
 You'll need [Node](https://nodejs.org/) 22.18 or newer. It's a [SvelteKit](https://svelte.dev/docs/kit) app that runs on [Wrangler](https://developers.cloudflare.com/workers/wrangler/) locally, D1, queue and all.
 
@@ -146,7 +147,7 @@ Put the secrets in `.dev.vars` first, as the crawler talks to the real GitHub AP
 
 ## Credits
 
-Built on the idea, layout and URLs of [gitstar-ranking](https://github.com/k0kubun/gitstar-ranking) by [@k0kubun](https://github.com/k0kubun), which kept the ranking going for years. Star counts come from the [GitHub API](https://docs.github.com/en/rest).
+Kudos to @k0kubun for his [original version](https://github.com/k0kubun/gitstar-ranking), which he ran for years, before it was taken offline in November 2026.
 
 ##### Contributors
 
