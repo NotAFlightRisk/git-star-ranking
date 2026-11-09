@@ -56,6 +56,13 @@ export async function details(owner: OwnerRow, repo: RepoRow) {
   ]);
   const overall = all && among(all, repo.stars);
   const language = mine && { name: repo.language!, ...among(mine, repo.stars) };
+  const [near, moved] = await Promise.all([
+    nearby(repo.id, [
+      { on: local, rank: language?.rank.rank, language: language?.name },
+      { on: latest && listing(latest, 'repositories'), rank: overall?.rank.rank }
+    ]),
+    overall ? movement('repositories', repo.id) : undefined
+  ]);
   return {
     ...overall,
     language,
@@ -63,11 +70,8 @@ export async function details(owner: OwnerRow, repo: RepoRow) {
     milestone: all && milestone(all, repo.stars),
     club: all && club(all, repo.stars),
     yearly: yearly(repo),
-    neighbours: await nearby(repo.id, [
-      { on: local, rank: language?.rank.rank, language: language?.name },
-      { on: latest && listing(latest, 'repositories'), rank: overall?.rank.rank }
-    ]),
-    moved: overall ? await movement('repositories', repo.id) : undefined,
+    neighbours: near,
+    moved,
     siblings: family,
     schedule: owner.refreshed_at > 0 ? schedule(owner) : undefined
   };

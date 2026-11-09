@@ -6,7 +6,13 @@
 
   interface Props {
     owner: { login: string; stars: number };
-    repos: { name: string; stars: number; language: string | null; created_at: number | null }[];
+    repos: {
+      id: number;
+      name: string;
+      stars: number;
+      language: string | null;
+      created_at: number | null;
+    }[];
     languages: { language: string | null; repos: number; stars: number }[];
   }
 

@@ -72,10 +72,12 @@ export const BOARDS = [
   { key: 'repositories', path: '/repositories', label: 'Repositories', noun: 'Repository' }
 ] as const;
 
-/** A board page's address, leaving out the first page and any language not asked for */
+/** A board page's address, leaving out the first page and any language not asked for.
+ * The language is spelt as the snapshot's slugs are, so each board has the one address */
 export function boardPath(path: string, page = 1, language?: string | null) {
-  const params = new URLSearchParams();
-  if (language) params.set('language', language.toLowerCase());
-  if (page > 1) params.set('page', String(page));
-  return `${path}${params.size ? `?${params}` : ''}`;
+  const query = [
+    language && `language=${encodeURIComponent(language.toLowerCase())}`,
+    page > 1 && `page=${page}`
+  ].filter(Boolean);
+  return query.length ? `${path}?${query.join('&')}` : path;
 }

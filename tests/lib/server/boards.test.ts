@@ -1,5 +1,12 @@
-import { describe, expect, it } from 'vitest';
-import { around, languageListing, listing, shift } from '../../../src/lib/server/boards.ts';
+import { env } from 'cloudflare:workers';
+import { beforeAll, describe, expect, it } from 'vitest';
+import {
+  around,
+  languageListing,
+  listing,
+  neighbours,
+  shift
+} from '../../../src/lib/server/boards.ts';
 import type { Meta } from '../../../src/lib/server/snapshot.ts';
 
 const rows = Array.from({ length: 10 }, (_, id) => ({ id }));
@@ -62,5 +69,37 @@ describe('shift', () => {
 
   it('has nothing for one that has dropped off', () => {
     expect(shift(now, [7, 5], 7)).toBeUndefined();
+  });
+});
+
+describe('neighbours', () => {
+  const entry = (id: number, rank: number) => ({ id, rank, login: `user-${id}`, stars: 0 });
+  // pages of three, with three tied at #3 across the break
+  const files: Record<string, unknown> = {
+    meta: { at: 1, boards: {}, languages: [] },
+    'board/users/1': [entry(1, 1), entry(2, 2), entry(3, 3)],
+    'board/users/2': [entry(4, 3), entry(5, 3), entry(6, 6)]
+  };
+  const board = { key: 'users', size: 3, pages: 2 };
+  const pageOf = async (id: number, rank: number) => (await neighbours(board, id, rank))?.page;
+
+  beforeAll(() => {
+    const get = async (key: string) => (key in files ? { json: async () => files[key] } : null);
+    Object.assign(env, { SNAPSHOTS: { get } });
+  });
+
+  it('finds an entry on the page its rank points to', async () => {
+    expect(await pageOf(2, 2)).toBe(1);
+    expect(await pageOf(6, 6)).toBe(2);
+  });
+
+  it('looks a page either side when a tie or a later count moved it', async () => {
+    expect(await pageOf(5, 3)).toBe(2);
+    expect(await pageOf(3, 4)).toBe(1);
+  });
+
+  it('gives nothing for an entry off the board', async () => {
+    expect(await pageOf(99, 5)).toBeUndefined();
+    expect(await pageOf(99, 40)).toBeUndefined();
   });
 });

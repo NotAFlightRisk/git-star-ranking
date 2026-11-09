@@ -25,14 +25,18 @@ export async function profile(owner: OwnerRow) {
   const counted = owner.refreshed_at > 0;
   const ranked = counted && owner.stars > 0 ? owners : undefined;
   const rank = ranked && position(ranked, owner.stars);
-  const near = latest && listing(latest, board);
+  const listed = latest && listing(latest, board);
+  const [near, moved] = await Promise.all([
+    rank && listed ? neighbours(listed, owner.id, rank.rank) : undefined,
+    rank ? movement(board, owner.id) : undefined
+  ]);
   return {
     rank,
     next: ranked && nextUp(ranked, owner.stars),
     milestone: ranked && milestone(ranked, owner.stars),
     spread: ranked && { bands: bands(ranked), marks: marks(ranked) },
-    neighbours: rank && near ? await neighbours(near, owner.id, rank.rank) : undefined,
-    moved: rank ? await movement(board, owner.id) : undefined,
+    neighbours: near,
+    moved,
     repos: repos.map((repo) => ({ ...repo, rank: all && rankOf(all, repo.stars) })),
     languages,
     tiers,

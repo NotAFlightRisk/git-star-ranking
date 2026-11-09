@@ -3,6 +3,7 @@
   import { squarify, type Tile } from '#lib/treemap.ts';
 
   interface Piece {
+    key: number | string;
     label: string;
     stars: number;
     tone: string;
@@ -12,7 +13,7 @@
 
   interface Props {
     owner: { login: string; stars: number };
-    repos: { name: string; stars: number; language: string | null }[];
+    repos: { id: number; name: string; stars: number; language: string | null }[];
     languages: { repos: number; stars: number }[];
     tone: (language: string | null) => string;
   }
@@ -28,6 +29,7 @@
     const listed = shown.reduce((sum, repo) => sum + repo.stars, 0);
     const others = languages.reduce((sum, row) => sum + row.repos, 0) - shown.length;
     const list: Piece[] = shown.map((repo) => ({
+      key: repo.id,
       label: repo.name,
       stars: repo.stars,
       tone: tone(repo.language),
@@ -38,7 +40,9 @@
       { label: `${count(others, 'more repo')}`, stars: tracked - listed, detail: '50+ stars each' },
       { label: 'Smaller repos', stars: owner.stars - tracked, detail: 'under 50 stars each' }
     ];
-    for (const piece of rest) if (piece.stars > 0) list.push({ ...piece, tone: '' });
+    for (const piece of rest) {
+      if (piece.stars > 0) list.push({ ...piece, key: piece.label, tone: '' });
+    }
     return list.sort((a, b) => b.stars - a.stars);
   });
 
@@ -57,7 +61,7 @@
 <figure>
   <figcaption><h2>Where the stars are</h2></figcaption>
   <div class="map">
-    {#each tiles as tile (tile.item.label)}
+    {#each tiles as tile (tile.item.key)}
       {@const { item } = tile}
       <svelte:element
         this={item.href ? 'a' : 'div'}

@@ -102,10 +102,14 @@ export function languageListing(latest: Meta, language: string | null): Listing 
 
 /** Who sits near an entry on its board, for those in the pages we keep */
 export async function neighbours<T extends OwnerEntry>(board: Listing, id: number, rank: number) {
-  const page = Math.ceil(rank / board.size);
-  if (page > board.pages) return undefined;
-  const rows = around((await entries<T>(board.key, page)).rows, id);
-  return rows && { page, rows };
+  const guess = Math.ceil(rank / board.size);
+  // a tie across two pages, or stars counted since the snapshot, can leave it a page either side
+  for (const page of [guess, guess + 1, guess - 1]) {
+    if (page < 1 || page > board.pages) continue;
+    const rows = around((await entries<T>(board.key, page)).rows, id);
+    if (rows) return { page, rows };
+  }
+  return undefined;
 }
 
 /** Where an entry sits in two of a board's daily lists, counting from one */

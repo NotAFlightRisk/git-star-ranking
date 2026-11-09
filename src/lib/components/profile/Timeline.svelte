@@ -2,6 +2,7 @@
   import { month, number, short } from '#lib/format.ts';
 
   interface Repo {
+    id: number;
     name: string;
     stars: number;
     language: string | null;
@@ -35,7 +36,7 @@
   const years = $derived(
     Array.from({ length: Math.floor((last - first) / step) + 1 }, (_, i) => first + i * step)
   );
-  const named = $derived(new Set(repos.slice(0, NAMED).map((repo) => repo.name)));
+  const named = $derived(new Set(repos.slice(0, NAMED).map((repo) => repo.id)));
   let hovered = $state<Repo>();
 </script>
 
@@ -61,7 +62,7 @@
       {#each powers as power (power)}
         <span class="grid" style:bottom="{up(power)}%"><span>{short(power)}</span></span>
       {/each}
-      {#each repos.toReversed() as repo (repo.name)}
+      {#each repos.toReversed() as repo (repo.id)}
         {@const x = across(repo.created_at)}
         <span
           class="dot"
@@ -73,7 +74,7 @@
           onpointerenter={() => (hovered = repo)}
           onpointerleave={() => (hovered = undefined)}
         >
-          {#if named.has(repo.name)}<span class="label">{repo.name}</span>{/if}
+          {#if named.has(repo.id)}<span class="label">{repo.name}</span>{/if}
         </span>
       {/each}
     </div>
