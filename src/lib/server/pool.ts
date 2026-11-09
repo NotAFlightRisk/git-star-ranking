@@ -57,8 +57,19 @@ export class TokenPool extends DurableObject {
     return { token: await this.current(), wait: 0 };
   }
 
+  /** Each resource's headroom as GitHub last told us, leaving out windows that have passed */
   async status() {
-    return { buckets: Object.fromEntries(this.buckets), leases: this.leases.length };
+    const now = Date.now();
+    const ahead = (at: number) => (at > now ? at : null);
+    const buckets = [...this.buckets].map(([resource, bucket]) => ({
+      resource,
+      remaining: bucket.reset > now ? (bucket.remaining ?? null) : null,
+      reset: ahead(bucket.reset),
+      blocked: ahead(bucket.blocked),
+      minute: now - bucket.window < MINUTE ? bucket.used : 0,
+      perMinute: PER_MINUTE[resource]
+    }));
+    return { buckets, leases: this.leases.filter((until) => until > now).length };
   }
 
   private bucket(resource: Resource) {

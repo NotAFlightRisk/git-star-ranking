@@ -29,7 +29,12 @@ export default defineConfig({
           'default-src': ['self'],
           'script-src': ['self', ...pulse],
           'connect-src': ['self', ...pulse, ...oops],
-          'img-src': ['self', 'data:', 'https://avatars.githubusercontent.com'],
+          'img-src': [
+            'self',
+            'data:',
+            'https://avatars.githubusercontent.com',
+            'https://img.shields.io'
+          ],
           'style-src': ['self', 'unsafe-inline'],
           'base-uri': ['none'],
           'form-action': ['self'],

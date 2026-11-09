@@ -1,8 +1,8 @@
 import { env } from 'cloudflare:workers';
-import { DAY, refreshDays, settings } from './config.ts';
+import { DAY, refreshDays, settings, STAR_TIERS } from './config.ts';
 import { searchQuery, type Job } from './sweep.ts';
-import type { Found, Kind, Owner } from './github.ts';
-import { meterD1 } from './usage.ts';
+import type { Found, Kind, Owner, Repo } from './github.ts';
+import { meter, meterD1 } from './usage.ts';
 
 export interface OwnerRow {
   id: number;
@@ -13,6 +13,9 @@ export interface OwnerRow {
   refreshed_at: number;
   due_at: number;
   missed: number;
+  name: string | null;
+  followers: number | null;
+  joined_at: number | null;
 }
 
 export interface RepoRow {
@@ -22,29 +25,80 @@ export interface RepoRow {
   stars: number;
   language: string | null;
   description: string | null;
+  created_at: number | null;
+}
+
+/** The extras only a repo's own page shows */
+export interface RepoDetails extends RepoRow {
+  forks: number | null;
+  license: string | null;
+  archived: number | null;
 }
 
 export const seconds = () => Math.floor(Date.now() / 1000);
 
 const each = (column: number) => `json_extract(value, '$[${column}]')`;
 
-const UPSERT_REPOS = `
-  INSERT INTO repos (id, owner_id, name, stars, language, description)
-  SELECT ${[0, 1, 2, 3, 4, 5].map(each).join(', ')} FROM json_each(?1)
-  WHERE NOT EXISTS (SELECT 1 FROM owners WHERE id = ${each(1)} AND hidden = 1)
-  ON CONFLICT (id) DO UPDATE SET owner_id = excluded.owner_id, name = excluded.name,
-    stars = excluded.stars, language = excluded.language, description = excluded.description
-  WHERE repos.stars <> excluded.stars OR repos.owner_id <> excluded.owner_id
-    OR repos.name <> excluded.name COLLATE BINARY OR repos.language IS NOT excluded.language
-    OR repos.description IS NOT excluded.description`;
+const DETAILS = ['description', 'created_at', 'license', 'archived'];
+const REPO = ['id', 'owner_id', 'name', 'stars', 'language', ...DETAILS, 'forks'];
+
+/** A repo as REPO lists its columns, for the writes below */
+const repoRow = (repo: Repo, ownerId: number) => [
+  repo.id,
+  ownerId,
+  repo.name,
+  repo.stars,
+  repo.language,
+  repo.description,
+  repo.created,
+  repo.license,
+  repo.archived,
+  repo.forks
+];
+
+// each incoming repo, unless its owner has asked to be left out
+const INCOMING = `(SELECT ${REPO.map((column, i) => `${each(i)} AS ${column}`).join(', ')}
+  FROM json_each(?1) WHERE NOT EXISTS (SELECT 1 FROM owners WHERE id = ${each(1)} AND hidden = 1)
+) AS new`;
+
+const changed = (columns: string[]) =>
+  columns.map((column) => `repos.${column} IS NOT new.${column} COLLATE BINARY`).join(' OR ');
+
+// D1 bills a row for each index a SET touches, changed or not, so columns go in index groups
+function updateRepos(columns: string[], when = changed(columns)) {
+  const set = columns.map((column) => `${column} = new.${column}`);
+  return `UPDATE repos SET ${set.join(', ')} FROM ${INCOMING}
+    WHERE repos.id = new.id AND (${when})`;
+}
+
+/** New repos, then only what changed. Forks move most days, so they ride along with other writes */
+const REPO_WRITES = [
+  `INSERT INTO repos (${REPO.join(', ')}) SELECT * FROM ${INCOMING} WHERE true
+   ON CONFLICT (id) DO NOTHING`,
+  updateRepos(['stars', 'forks'], changed(['stars'])),
+  updateRepos(['owner_id', 'name', 'language']),
+  updateRepos(
+    [...DETAILS, 'forks'],
+    `${changed(DETAILS)} OR (repos.forks IS NULL AND new.forks IS NOT NULL)`
+  )
+];
 
 const UPSERT_OWNERS = `
-  INSERT INTO owners (id, login, kind, stars, repos, refreshed_at, due_at)
-  SELECT ${[0, 1, 2, 3, 4].map(each).join(', ')}, ?2, ${each(5)} FROM json_each(?1) WHERE true
-  ON CONFLICT (id) DO UPDATE SET login = excluded.login, kind = excluded.kind,
-    stars = excluded.stars, repos = excluded.repos, refreshed_at = excluded.refreshed_at,
-    due_at = excluded.due_at, missed = 0
+  INSERT INTO owners (id, login, kind, stars, repos, refreshed_at, due_at, name, followers,
+    joined_at)
+  SELECT ${[0, 1, 2, 3, 4].map(each).join(', ')}, ?2, ${[5, 6, 7, 8].map(each).join(', ')}
+  FROM json_each(?1) WHERE true
+  ON CONFLICT (id) DO UPDATE SET kind = excluded.kind, stars = excluded.stars,
+    repos = excluded.repos, refreshed_at = excluded.refreshed_at, due_at = excluded.due_at,
+    name = excluded.name, followers = excluded.followers, joined_at = excluded.joined_at,
+    missed = 0
   WHERE owners.hidden = 0`;
+
+// logins are indexed too, so a rename is the only time one's written
+const RENAME_OWNERS = `
+  UPDATE owners SET login = new.login
+  FROM (SELECT ${each(0)} AS id, ${each(1)} AS login FROM json_each(?1)) AS new
+  WHERE owners.id = new.id AND owners.hidden = 0 AND owners.login <> new.login COLLATE BINARY`;
 
 // a stub waits on its first refresh, biggest first, as due_at sorts below everyone else
 const STUB_OWNERS = `
@@ -72,6 +126,11 @@ export const many = async <T>(statement: D1PreparedStatement) =>
 export const one = async <T>(statement: D1PreparedStatement) =>
   (await many<T>(statement))[0] ?? null;
 
+const writeRepos = (repos: unknown[][]) => {
+  const json = JSON.stringify(repos);
+  return REPO_WRITES.map((text) => sql(text, json));
+};
+
 const jitter = () => 0.9 + Math.random() * 0.2;
 
 /** Writes what a refresh found, touching only rows that changed */
@@ -81,17 +140,27 @@ export async function saveOwners(fetched: Owner[], gone: number[] = []) {
   const owners = fetched.map((owner) => {
     const stars = owner.list.reduce((sum, repo) => sum + repo.stars, 0);
     const due = now + Math.round(refreshDays(stars, tiers) * DAY * jitter());
-    return [owner.id, owner.login, owner.kind, stars, owner.repos, due];
+    return [
+      owner.id,
+      owner.login,
+      owner.kind,
+      stars,
+      owner.repos,
+      due,
+      owner.name,
+      owner.followers,
+      owner.joined
+    ];
   });
   const repos = fetched.flatMap((owner) =>
-    owner.list
-      .filter((repo) => repo.stars >= minStars)
-      .map((repo) => [repo.id, owner.id, repo.name, repo.stars, repo.language, repo.description])
+    owner.list.filter((repo) => repo.stars >= minStars).map((repo) => repoRow(repo, owner.id))
   );
   const complete = fetched.filter((owner) => !owner.cursor).map((owner) => owner.id);
+  const json = JSON.stringify(owners);
   const statements = [
-    sql(UPSERT_OWNERS, JSON.stringify(owners), now),
-    sql(UPSERT_REPOS, JSON.stringify(repos)),
+    sql(UPSERT_OWNERS, json, now),
+    sql(RENAME_OWNERS, json),
+    ...writeRepos(repos),
     sql(PRUNE_REPOS, JSON.stringify(complete), JSON.stringify(repos.map(([id]) => id)))
   ];
   if (gone.length) {
@@ -109,18 +178,11 @@ export async function saveFound(found: Found[]) {
     row[3] += stars;
     owners.set(owner.id, row);
   }
-  const repos = found.map((repo) => [
-    repo.id,
-    repo.owner.id,
-    repo.name,
-    repo.stars,
-    repo.language,
-    repo.description
-  ]);
+  const repos = found.map((repo) => repoRow(repo, repo.owner.id));
   meterD1(
     await env.DB.batch([
       sql(STUB_OWNERS, JSON.stringify([...owners.values()])),
-      sql(UPSERT_REPOS, JSON.stringify(repos))
+      ...writeRepos(repos)
     ])
   );
 }
@@ -135,8 +197,17 @@ export const due = (limit: number) =>
     )
   );
 
+/** When the longest-waiting account on a schedule fell due. New and hurried ones go first anyway */
+export const oldestDue = async () =>
+  (
+    await one<{ due_at: number }>(
+      sql('SELECT due_at FROM owners WHERE due_at > 0 AND hidden = 0 ORDER BY due_at LIMIT 1')
+    )
+  )?.due_at;
+
 /** Leaves an owner GitHub wouldn't give us for a day, so one bad account can't wedge the queue */
 export async function snooze(ids: number[], missed = false) {
+  meter('crawl_snoozed', ids.length);
   meterD1(
     await sql(
       `UPDATE owners SET due_at = ?2, missed = missed OR ?3
@@ -179,37 +250,87 @@ export async function hurry(owner: OwnerRow, after = DAY) {
 export const findOwner = (login: string) =>
   one<OwnerRow>(
     sql(
-      `SELECT id, login, kind, stars, repos, refreshed_at, due_at, missed FROM owners
-       WHERE login = ? AND hidden = 0 ORDER BY refreshed_at DESC LIMIT 1`,
+      `SELECT id, login, kind, stars, repos, refreshed_at, due_at, missed, name, followers,
+       joined_at FROM owners WHERE login = ? AND hidden = 0 ORDER BY refreshed_at DESC LIMIT 1`,
       login
     )
   );
 
-export const ownerRepos = (ownerId: number) =>
-  many<RepoRow>(
-    sql(
-      `SELECT id, owner_id, name, stars, language, description FROM repos
-       WHERE owner_id = ? ORDER BY stars DESC, id LIMIT 100`,
-      ownerId
-    )
+export interface LanguageRow {
+  language: string | null;
+  repos: number;
+  stars: number;
+}
+
+/** An owner's top repos, all of them totted up by language, and how many clear each star tier */
+export async function portfolio(ownerId: number) {
+  const over = STAR_TIERS.map((least, i) => `SUM(stars >= ${least}) AS t${i}`).join(', ');
+  const [repos, languages, tiers] = meterD1(
+    await env.DB.batch([
+      sql(
+        `SELECT id, owner_id, name, stars, language, description, created_at FROM repos
+         WHERE owner_id = ? ORDER BY stars DESC, id LIMIT 100`,
+        ownerId
+      ),
+      sql(
+        `SELECT language, COUNT(*) AS repos, SUM(stars) AS stars FROM repos
+         WHERE owner_id = ? GROUP BY language ORDER BY stars DESC`,
+        ownerId
+      ),
+      sql(`SELECT ${over} FROM repos WHERE owner_id = ?`, ownerId)
+    ])
   );
+  const counts = (tiers.results[0] ?? {}) as Record<string, number | null>;
+  return {
+    repos: repos.results as RepoRow[],
+    languages: languages.results as LanguageRow[],
+    tiers: STAR_TIERS.map((least, i) => ({ least, repos: counts[`t${i}`] ?? 0 }))
+  };
+}
 
 export const findRepo = (ownerId: number, name: string) =>
-  one<RepoRow>(
+  one<RepoDetails>(
     sql(
-      `SELECT id, owner_id, name, stars, language, description FROM repos
-       WHERE owner_id = ? AND name = ? LIMIT 1`,
+      `SELECT id, owner_id, name, stars, language, description, created_at, forks, license,
+       archived FROM repos WHERE owner_id = ? AND name = ? LIMIT 1`,
       ownerId,
       name
     )
   );
+
+/** A repo among its owner's others: their top few, how many there are, and its place */
+export async function siblings(repo: RepoRow, count = 5) {
+  const [top, tally] = meterD1(
+    await env.DB.batch([
+      sql(
+        `SELECT id, name, stars, language FROM repos WHERE owner_id = ?
+         ORDER BY stars DESC, id LIMIT ?`,
+        repo.owner_id,
+        count + 1
+      ),
+      sql(
+        'SELECT COUNT(*) AS repos, SUM(stars > ?2) AS above FROM repos WHERE owner_id = ?1',
+        repo.owner_id,
+        repo.stars
+      )
+    ])
+  );
+  const { repos, above } = tally.results[0] as { repos: number; above: number | null };
+  const rows = top.results as Pick<RepoRow, 'id' | 'name' | 'stars' | 'language'>[];
+  return {
+    rows: rows.filter(({ id }) => id !== repo.id).slice(0, count),
+    place: (above ?? 0) + 1,
+    of: repos
+  };
+}
 
 /** Hides an account for good, and leaves a tombstone so a crawl can't bring it back */
 export async function forget(id: number) {
   meterD1(
     await env.DB.batch([
       env.DB.prepare(
-        `UPDATE owners SET hidden = 1, login = '', stars = 0, repos = 0, due_at = 9e15 WHERE id = ?`
+        `UPDATE owners SET hidden = 1, login = '', name = NULL, followers = NULL, joined_at = NULL,
+         stars = 0, repos = 0, due_at = 9e15 WHERE id = ?`
       ).bind(id),
       env.DB.prepare('DELETE FROM repos WHERE owner_id = ?').bind(id)
     ])
@@ -251,7 +372,7 @@ export async function search(query: string) {
   const [found, matched] = meterD1(await env.DB.batch([owners, repos]));
   return {
     owners: found.results as Pick<OwnerRow, 'id' | 'login' | 'kind' | 'stars'>[],
-    repos: matched.results as (Omit<RepoRow, 'owner_id'> & { login: string })[]
+    repos: matched.results as (Omit<RepoRow, 'owner_id' | 'created_at'> & { login: string })[]
   };
 }
 

@@ -5,6 +5,9 @@ const FRESH = 10 * 60_000;
 const KEEP = 'public, max-age=86400';
 const BROWSER = 'public, max-age=60';
 
+// a response can set its own time in browsers, which survives being stored
+const browser = (response: Response) => response.headers.get('x-browser-cache') ?? BROWSER;
+
 const gone = (status: number) =>
   status === 404 || status === 410 || (status >= 300 && status < 400);
 
@@ -26,16 +29,16 @@ export async function edge(url: URL, render: () => Promise<Response>) {
   const cache = caches.default;
   const hit = await cache.match(key(url));
   const age = hit ? Date.now() - Number(hit.headers.get('x-stored')) : Infinity;
-  if (hit && age < FRESH) return restamp(hit, BROWSER);
+  if (hit && age < FRESH) return restamp(hit, browser(hit));
   const fresh = render().then(async (response) => {
     if (response.status !== 200 || response.headers.has('set-cookie')) {
       if (hit && gone(response.status)) await cache.delete(key(url));
       return response;
     }
     await cache.put(key(url), restamp(response.clone(), KEEP, Date.now()));
-    return restamp(response, BROWSER);
+    return restamp(response, browser(response));
   });
   if (!hit) return fresh;
   waitUntil(fresh);
-  return restamp(hit, BROWSER);
+  return restamp(hit, browser(hit));
 }

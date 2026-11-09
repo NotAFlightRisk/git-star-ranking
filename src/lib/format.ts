@@ -10,10 +10,37 @@ const when = new Intl.DateTimeFormat('en-GB', {
   timeZoneName: 'short'
 });
 
+const calendar = new Intl.DateTimeFormat('en-GB', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  timeZone: 'UTC'
+});
+
+const monthly = new Intl.DateTimeFormat('en-GB', {
+  month: 'short',
+  year: 'numeric',
+  timeZone: 'UTC'
+});
+
 export const number = (n: number) => whole.format(n);
+export const count = (n: number, noun: string) => `${number(n)} ${noun}${n === 1 ? '' : 's'}`;
+/** A share as a whole percent, without rounding a sliver down to nothing */
+export const percent = (share: number) =>
+  share > 0 && share < 0.005 ? '<1%' : `${Math.round(share * 100)}%`;
 export const short = (n: number) => compact.format(n);
 export const date = (ms: number) => when.format(ms);
+export const day = (ms: number) => calendar.format(ms);
+export const month = (ms: number) => monthly.format(ms);
 export const iso = (ms: number) => new Date(ms).toISOString();
+
+/** A stretch of time in its biggest whole unit, like "40 minutes" or "3 days" */
+export function span(ms: number) {
+  const minutes = Math.max(Math.floor(ms / 60_000), 0);
+  if (minutes < 60) return count(minutes, 'minute');
+  const hours = Math.floor(minutes / 60);
+  return hours < 48 ? count(hours, 'hour') : count(Math.floor(hours / 24), 'day');
+}
 
 /** "top 0.4%" reads better than a long decimal, and nobody is in the top 0% */
 export const top = (share: number) => {
@@ -22,6 +49,14 @@ export const top = (share: number) => {
   if (percent < 1) return `top ${percent.toPrecision(1)}%`;
   return `top ${Math.ceil(percent)}%`;
 };
+
+/** A week's movement on a board, from where an entry sat to where it sits now */
+export function trend({ from, to }: { from: number | null; to: number }) {
+  if (from === null) return 'New on the board this week';
+  const places = from - to;
+  if (!places) return 'Same place as a week ago';
+  return `${places > 0 ? 'Up' : 'Down'} ${count(Math.abs(places), 'place')} this week`;
+}
 
 /** GitHub's :emoji: shortcodes only mean something on GitHub, and a cut lands on a whole word.
  * Anything already at the limit is treated as cut, as older rows were chopped at exactly 200 */
@@ -44,3 +79,13 @@ export const BOARDS = [
   { key: 'organizations', path: '/organizations', label: 'Organizations', noun: 'Organization' },
   { key: 'repositories', path: '/repositories', label: 'Repositories', noun: 'Repository' }
 ] as const;
+
+/** A board page's address, leaving out the first page and any language not asked for.
+ * The language is spelt as the snapshot's slugs are, so each board has the one address */
+export function boardPath(path: string, page = 1, language?: string | null) {
+  const query = [
+    language && `language=${encodeURIComponent(language.toLowerCase())}`,
+    page > 1 && `page=${page}`
+  ].filter(Boolean);
+  return query.length ? `${path}?${query.join('&')}` : path;
+}

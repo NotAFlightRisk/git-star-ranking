@@ -11,8 +11,10 @@ export const ALLOWANCES = {
   blob_reads: 10_000_000
 };
 export const ALERT_AT = 0.7;
+// D1's cap on one database, which fills up rather than starting afresh each month
+export const DATABASE_BYTES = 10_000_000_000;
 
-export type Metric = keyof typeof ALLOWANCES | `github_${string}`;
+export type Metric = keyof typeof ALLOWANCES | `github_${string}` | 'crawl_snoozed';
 
 const counts = new Map<Metric, number>();
 let flushed = Date.now();
@@ -48,13 +50,19 @@ export async function flush(force = false) {
   });
 }
 
+/** This month's usage against each allowance, with last month's alongside */
 export async function budget(at = new Date()) {
-  const { results } = meterD1(
-    await env.DB.prepare('SELECT metric, amount FROM usage WHERE month = ?')
-      .bind(month(at))
-      .all<{ metric: string; amount: number }>()
+  const now = month(at);
+  const { results, meta } = meterD1(
+    await env.DB.prepare('SELECT month, metric, amount FROM usage WHERE month IN (?1, ?2)')
+      .bind(now, month(new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth() - 1))))
+      .all<{ month: string; metric: string; amount: number }>()
   );
-  const used = new Map(results.map((row) => [row.metric, row.amount]));
+  const current = results.filter((row) => row.month === now);
+  const used = new Map(current.map((row) => [row.metric, row.amount]));
+  const before = new Map(
+    results.filter((row) => row.month !== now).map((row) => [row.metric, row.amount])
+  );
   const days = new Date(at.getUTCFullYear(), at.getUTCMonth() + 1, 0).getDate();
   const elapsed = (at.getUTCDate() - 1 + at.getUTCHours() / 24) / days || 1 / (24 * days);
   const metrics = Object.entries(ALLOWANCES).map(([metric, allowance]) => {
@@ -64,9 +72,15 @@ export async function budget(at = new Date()) {
       amount,
       allowance,
       share: amount / allowance,
-      projected: amount / elapsed / allowance
+      projected: amount / elapsed / allowance,
+      last: before.get(metric) ?? 0
     };
   });
-  const github = results.filter((row) => row.metric.startsWith('github_'));
-  return { metrics, github, alert: metrics.filter((row) => row.share >= ALERT_AT) };
+  return {
+    metrics,
+    github: current.filter((row) => row.metric.startsWith('github_')),
+    snoozed: used.get('crawl_snoozed') ?? 0,
+    database: { bytes: meta.size_after, share: meta.size_after / DATABASE_BYTES },
+    alert: metrics.filter((row) => row.share >= ALERT_AT)
+  };
 }

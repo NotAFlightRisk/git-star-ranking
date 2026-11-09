@@ -1,7 +1,8 @@
 <script lang="ts">
   import { page } from '$app/state';
   import type { ComponentProps } from 'svelte';
-  import { BOARDS, number } from '#lib/format.ts';
+  import { BOARDS, boardPath, number } from '#lib/format.ts';
+  import Language from './Language.svelte';
   import Pager from './Pager.svelte';
   import RankTable from './RankTable.svelte';
   import Seo from './Seo.svelte';
@@ -26,18 +27,18 @@
   const subject = $derived(
     data.language ? `${data.language} repositories` : info.label.toLowerCase()
   );
-  const href = (page: number) => {
-    const params = new URLSearchParams();
-    if (data.language) params.set('language', data.language.toLowerCase());
-    if (page > 1) params.set('page', String(page));
-    return `${info.path}${params.size ? `?${params}` : ''}`;
-  };
+  const href = (page: number) => boardPath(info.path, page, data.language);
   const repos = $derived(data.board === 'repositories');
-  const summary = $derived.by(() => {
-    if (data.language) return `The top 500 ${data.language} repositories, ranked by stars.`;
+  const summary = $derived(
+    data.language
+      ? `The top 500 ${data.language} repositories, ranked by stars`
+      : `The top 5k GitHub ${subject}, ranked by ${repos ? 'stars' : 'total stars received'}`
+  );
+  // the board total counts every repository, so a language board leaves it out
+  const updated = $derived.by(() => {
+    if (data.language || !data.total) return 'Last updated';
     const noun = data.board === 'users' ? 'profiles' : subject;
-    const scored = data.total ? ` (${number(data.total)} ${noun} scored)` : '';
-    return `The top 5k GitHub ${subject}, ranked by ${repos ? 'stars' : 'total stars received'}${scored}.`;
+    return `${number(data.total)} scored ${noun}, last updated`;
   });
   const first = $derived((data.page - 1) * data.size + 1);
   // a hundred owners sit side by side as two fifties on a wide screen
@@ -71,7 +72,8 @@
 
 <header class="head">
   <h1>{data.language ? `${data.language} repositories` : info.label}</h1>
-  <p>{summary} <Updated at={data.at} label="Last updated" inline /></p>
+  <p>{summary}</p>
+  <Updated at={data.at} label={updated} />
 </header>
 
 {#if data.languages.length}
@@ -80,8 +82,10 @@
     {#each data.languages as language (language.slug)}
       <a
         href="/repositories?language={language.slug}"
-        aria-current={language.name === data.language ? 'page' : undefined}>{language.name}</a
+        aria-current={language.name === data.language ? 'page' : undefined}
       >
+        <Language name={language.name} />
+      </a>
     {/each}
   </nav>
 {/if}

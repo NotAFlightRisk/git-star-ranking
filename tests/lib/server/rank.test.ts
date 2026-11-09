@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { competition, histogram, percentile, rankOf } from '../../../src/lib/server/rank.ts';
+import {
+  atLeast,
+  bands,
+  competition,
+  histogram,
+  marks,
+  milestone,
+  nextUp,
+  percentile,
+  rankOf,
+  starsFor
+} from '../../../src/lib/server/rank.ts';
 
 const spread = histogram([
   { stars: 900, n: 1 },
@@ -34,5 +45,97 @@ describe('percentile', () => {
   it('never goes past everyone', () => {
     expect(percentile(spread, 1)).toBe(1);
     expect(percentile(histogram([]), 10)).toBe(1);
+  });
+});
+
+describe('atLeast', () => {
+  it('counts everyone at or above a count, ties and all', () => {
+    expect([900, 500, 400, 100, 50].map((stars) => atLeast(spread, stars))).toEqual([
+      1, 3, 3, 6, 6
+    ]);
+    expect(atLeast(spread, 1_000)).toBe(0);
+  });
+});
+
+describe('nextUp', () => {
+  it('points at the next count up and the rank it brings', () => {
+    expect(nextUp(spread, 100)).toEqual({ stars: 500, rank: 2 });
+    expect(nextUp(spread, 600)).toEqual({ stars: 900, rank: 1 });
+    expect(nextUp(spread, 10)).toEqual({ stars: 100, rank: 4 });
+  });
+
+  it('has nowhere to go from the top', () => {
+    expect(nextUp(spread, 900)).toBeUndefined();
+    expect(nextUp(spread, 2_000)).toBeUndefined();
+  });
+});
+
+describe('starsFor', () => {
+  it('finds the fewest stars that still rank inside the share', () => {
+    expect(starsFor(spread, 0.5)).toBe(500);
+    expect(starsFor(spread, 1)).toBe(100);
+  });
+
+  it('always lets the leader in, however small the share', () => {
+    expect(starsFor(spread, 0.001)).toBe(900);
+  });
+});
+
+describe('bands', () => {
+  it('counts every account once, in log steps from the least to the most', () => {
+    const steps = bands(spread);
+    expect(steps.map(({ from }) => from)).toEqual([100, 160, 250, 400, 630]);
+    expect(steps.at(-1)).toEqual({ from: 630, to: 1000, count: 1 });
+    expect(steps.find(({ from }) => from === 400)?.count).toBe(2);
+    expect(steps.reduce((sum, { count }) => sum + count, 0)).toBe(spread.total);
+  });
+
+  it('starts at one star and stays whole', () => {
+    const small = histogram([
+      { stars: 7, n: 1 },
+      { stars: 1, n: 4 }
+    ]);
+    expect(bands(small).map(({ from, to }) => [from, to])).toEqual([
+      [1, 2],
+      [2, 3],
+      [3, 4],
+      [4, 6],
+      [6, 10]
+    ]);
+    expect(bands(histogram([]))).toEqual([]);
+  });
+});
+
+describe('milestone', () => {
+  const board = histogram(Array.from({ length: 1_000 }, (_, i) => ({ stars: 1_000 - i, n: 1 })));
+
+  it('aims for the next tenth up, then each tenfold step past the top 10%', () => {
+    expect(milestone(board, 50)).toEqual({ percent: 90, stars: 101 });
+    expect(milestone(board, 850)).toEqual({ percent: 10, stars: 901 });
+    expect(milestone(board, 950)).toEqual({ percent: 1, stars: 991 });
+    expect(milestone(board, 995)).toEqual({ percent: 0.1, stars: 1_000 });
+  });
+
+  it('stops where the board is too small to have a finer step', () => {
+    expect(milestone(board, 1_000)).toBeUndefined();
+    expect(milestone(spread, 100)).toEqual({ percent: 60, stars: 500 });
+    expect(milestone(spread, 900)).toBeUndefined();
+  });
+});
+
+describe('marks', () => {
+  it('leaves out shares finer than one account', () => {
+    expect(marks(spread)).toEqual([{ share: 0.5, stars: 500 }]);
+  });
+
+  it('keeps one mark where two shares start at the same count', () => {
+    const lumpy = histogram([
+      { stars: 1_000, n: 20 },
+      { stars: 1, n: 980 }
+    ]);
+    expect(marks(lumpy)).toEqual([
+      { share: 0.5, stars: 1 },
+      { share: 0.01, stars: 1_000 }
+    ]);
   });
 });

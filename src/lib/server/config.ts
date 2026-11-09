@@ -5,6 +5,7 @@ export const PAGE_SIZE = { users: 100, organizations: 100, repositories: 50 } as
 export const LANGUAGES = 30;
 export const LANGUAGE_PAGES = 10;
 export const DAY = 86_400;
+export const STAR_TIERS = [100, 1_000, 10_000, 100_000];
 
 /** "1000:1,100:7,0:30" reads as: 1,000+ stars daily, 100+ weekly, the rest monthly */
 export const parseTiers = (spec: string) =>

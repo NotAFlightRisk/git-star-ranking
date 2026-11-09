@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Language from '#lib/components/Language.svelte';
   import Seo from '#lib/components/Seo.svelte';
   import Star from '#lib/components/Star.svelte';
   import { avatar, number } from '#lib/format.ts';
@@ -59,7 +60,9 @@
             <li>
               <div class="name">
                 <a href="/{repo.login}/{repo.name}">{repo.login}/<wbr />{repo.name}</a>
-                {#if repo.language}<span class="kind">{repo.language}</span>{/if}
+                {#if repo.language}
+                  <span class="kind"><Language name={repo.language} /></span>
+                {/if}
               </div>
               <span class="stars"><Star /> {number(repo.stars)}</span>
             </li>

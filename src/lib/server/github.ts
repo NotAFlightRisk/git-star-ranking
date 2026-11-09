@@ -20,6 +20,10 @@ export interface Repo {
   stars: number;
   language: string | null;
   description: string | null;
+  created: number | null;
+  forks: number | null;
+  license: string | null;
+  archived: boolean | null;
 }
 
 export interface Owner {
@@ -27,6 +31,9 @@ export interface Owner {
   login: string;
   kind: Kind;
   repos: number;
+  name: string | null;
+  followers: number | null;
+  joined: number | null;
   list: Repo[];
   cursor?: string;
 }
@@ -107,12 +114,15 @@ const repositories = (
   orderBy: { field: STARGAZERS, direction: DESC }) {
   totalCount
   pageInfo { hasNextPage endCursor }
-  nodes { databaseId name stargazerCount description primaryLanguage { name } }
+  nodes { databaseId name stargazerCount description primaryLanguage { name } createdAt
+    forkCount isArchived licenseInfo { spdxId } }
 }`;
 
+const PERSON = 'databaseId name createdAt followers { totalCount }';
+
 const fields = (after: string | null = null) => `__typename
-  ... on User { databaseId }
-  ... on Organization { databaseId }
+  ... on User { ${PERSON} }
+  ... on Organization { databaseId name createdAt }
   ... on RepositoryOwner { login ${repositories(after)} }`;
 
 interface RawRepo {
@@ -121,12 +131,19 @@ interface RawRepo {
   stargazerCount: number;
   description: string | null;
   primaryLanguage: { name: string } | null;
+  createdAt?: string;
+  forkCount?: number;
+  isArchived?: boolean;
+  licenseInfo?: { spdxId: string | null } | null;
 }
 
 interface RawOwner {
   __typename: string;
   databaseId: number;
   login: string;
+  name?: string | null;
+  createdAt?: string;
+  followers?: { totalCount: number };
   repositories: {
     totalCount: number;
     pageInfo: { hasNextPage: boolean; endCursor: string | null };
@@ -138,12 +155,21 @@ type Answer<T> = { data?: T; errors?: { type?: string; path?: (string | number)[
 
 export const short = (text: string | null) => tidy(text);
 
+const epoch = (iso?: string | null) => (iso ? Math.floor(Date.parse(iso) / 1000) : null);
+
+// GitHub's word for a licence file it can't match to a known one
+const licence = (spdx?: string | null) => (spdx === 'NOASSERTION' ? 'Other' : (spdx ?? null));
+
 const toRepo = (raw: RawRepo): Repo => ({
   id: raw.databaseId,
   name: raw.name,
   stars: raw.stargazerCount,
   language: raw.primaryLanguage?.name ?? null,
-  description: short(raw.description)
+  description: short(raw.description),
+  created: epoch(raw.createdAt),
+  forks: raw.forkCount ?? null,
+  license: licence(raw.licenseInfo?.spdxId),
+  archived: raw.isArchived ?? null
 });
 
 const toOwner = (raw: RawOwner): Owner => ({
@@ -151,6 +177,9 @@ const toOwner = (raw: RawOwner): Owner => ({
   login: raw.login,
   kind: raw.__typename === 'Organization' ? 1 : 0,
   repos: raw.repositories.totalCount,
+  name: raw.name?.trim() || null,
+  followers: raw.followers?.totalCount ?? null,
+  joined: epoch(raw.createdAt),
   list: raw.repositories.nodes.map(toRepo),
   cursor: raw.repositories.pageInfo.hasNextPage
     ? (raw.repositories.pageInfo.endCursor ?? undefined)
@@ -212,7 +241,7 @@ export async function ownerByLogin(token: string, login: string) {
 export async function viewer(token: string) {
   const { data } = await graphql<{ viewer: RawOwner }>(
     token,
-    `query { viewer { __typename databaseId login ${repositories(null)} } }`
+    `query { viewer { __typename ${PERSON} login ${repositories(null)} } }`
   );
   return toOwner(data.viewer);
 }
@@ -223,6 +252,10 @@ interface RawFound {
   stargazers_count: number;
   language: string | null;
   description: string | null;
+  created_at: string;
+  forks_count: number;
+  license: { spdx_id: string | null } | null;
+  archived: boolean;
   owner: { id: number; login: string; type: string };
 }
 
@@ -240,6 +273,10 @@ export async function searchRepos(token: string, q: string, page: number) {
       stars: raw.stargazers_count,
       language: raw.language,
       description: short(raw.description),
+      created: epoch(raw.created_at),
+      forks: raw.forks_count,
+      license: licence(raw.license?.spdx_id),
+      archived: raw.archived,
       owner: { id: raw.owner.id, login: raw.owner.login, kind: raw.owner.type === 'User' ? 0 : 1 }
     }));
   return { total: body.total_count, incomplete: body.incomplete_results, items };

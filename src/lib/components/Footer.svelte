@@ -12,6 +12,7 @@
     </div>
     <nav aria-label="About this site">
       <a href="/about">How it works</a>
+      <a href="/badge-builder">Badge builder</a>
       <a href="/about#privacy">Privacy</a>
       <a href="https://github.com/NotAFlightRisk/git-star-ranking">Source</a>
     </nav>

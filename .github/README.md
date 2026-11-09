@@ -30,13 +30,24 @@ Sign in with GitHub and your page is counted on the spot. It asks for no permiss
 
 ## Badges
 
-Our own one, which is just an image:
+The [badge builder](https://git-star-ranking.peng.ly/badge-builder) makes one for any account or repo. Or write the URL yourself:
 
 ```markdown
 ![git rank](https://git-star-ranking.peng.ly/users/<login>/badge.svg)
+![git rank](https://git-star-ranking.peng.ly/repositories/<owner>/<repo>/badge.svg)
 ```
 
-Or the Shields endpoint the original had, if you'd rather style it yourself:
+Add any of these to the query:
+
+| Param                 | Values                                                      | Default             |
+| --------------------- | ----------------------------------------------------------- | ------------------- |
+| `show`                | `rank`, `top`, `stars`, or `language` for repos             | `rank`              |
+| `style`               | `flat`, `flat-square`, `plastic`, `for-the-badge`, `social` | `flat`              |
+| `label`               | up to 40 characters                                         | depends on `show`   |
+| `color`, `labelColor` | hex without the `#`, or a Shields colour name               | blue, and dark grey |
+| `icon`                | `star`                                                      | none                |
+
+To have Shields draw it, swap `badge.svg` for `shields` and pass that to their endpoint badge:
 
 ```markdown
 ![git rank](https://img.shields.io/endpoint?url=https%3A%2F%2Fgit-star-ranking.peng.ly%2Fusers%2F<login>%2Fshields)

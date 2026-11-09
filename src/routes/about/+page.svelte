@@ -49,8 +49,9 @@
       It's never stored. Your session cookie only holds your GitHub id and login.
     </p>
     <p>
-      Want off the list? Sign in, open your page and use "Remove me". That deletes your repos from
-      our tables and stops us crawling you again. If you change your mind later,
+      Want off the list? Sign in, open your page and use "Remove me". That deletes your repos, name
+      and follower count from our tables and stops us crawling you again. If you change your mind
+      later,
       <a href="https://github.com/NotAFlightRisk/git-star-ranking/issues">open an issue</a>.
     </p>
     {#if counting}

@@ -1,27 +1,30 @@
 <script lang="ts">
-  import { page } from '$app/state';
-  import Copy from '#lib/components/Copy.svelte';
+  import Actions from '#lib/components/profile/Actions.svelte';
+  import Badges from '#lib/components/profile/Badges.svelte';
+  import Forget from '#lib/components/profile/Forget.svelte';
+  import Layout from '#lib/components/profile/Layout.svelte';
+  import Neighbours from '#lib/components/profile/Neighbours.svelte';
+  import Portfolio from '#lib/components/profile/Portfolio.svelte';
+  import QuickStats from '#lib/components/profile/QuickStats.svelte';
+  import Schedule from '#lib/components/profile/Schedule.svelte';
+  import Spread from '#lib/components/profile/Spread.svelte';
+  import Stats from '#lib/components/profile/Stats.svelte';
   import RankTable from '#lib/components/RankTable.svelte';
   import Seo from '#lib/components/Seo.svelte';
-  import Star from '#lib/components/Star.svelte';
-  import Updated from '#lib/components/Updated.svelte';
-  import { avatar, number, top } from '#lib/format.ts';
+  import { avatar, count, month, number } from '#lib/format.ts';
 
   const { data, form } = $props();
   const owner = $derived(data.owner);
   const noun = $derived(owner.kind ? 'organization' : 'user');
   const counted = $derived(owner.refreshed_at > 0);
-  const profile = $derived(`${page.url.origin}/${owner.login}`);
-  const badge = $derived(`${page.url.origin}/users/${owner.login}/badge.svg`);
-  const shields = $derived(
-    `https://img.shields.io/endpoint?url=${encodeURIComponent(`${page.url.origin}/users/${owner.login}/shields`)}`
-  );
+  const side = $derived(counted || data.neighbours || data.self);
   const schema = $derived({
     '@context': 'https://schema.org',
     '@type': 'ProfilePage',
     mainEntity: {
       '@type': owner.kind ? 'Organization' : 'Person',
-      name: owner.login,
+      name: owner.name ?? owner.login,
+      alternateName: owner.name ? owner.login : undefined,
       url: `https://github.com/${owner.login}`,
       image: avatar(owner.id, 256)
     }
@@ -36,81 +39,51 @@
   {schema}
 />
 
-<article class="profile">
-  <header class="who">
-    <img src={avatar(owner.id, 192)} alt="" width="96" height="96" />
-    <div>
-      <h1>{owner.login}</h1>
-      <p class="kind">
-        GitHub {noun} -
-        <a href="https://github.com/{owner.login}" rel="external">view on GitHub</a>
-      </p>
-    </div>
-  </header>
+{#snippet title()}
+  <h1>{owner.login}</h1>
+  <p class="dotted">
+    {#if owner.name}<span class="name">{owner.name}</span>{/if}
+    {#if owner.joined_at}<span>Joined {month(owner.joined_at * 1000)}</span>{/if}
+    {#if owner.followers !== null}<span>{count(owner.followers, 'follower')}</span>{/if}
+    <span><a href="https://github.com/{owner.login}" rel="external">View on GitHub</a></span>
+  </p>
+{/snippet}
 
-  <dl class="stats">
-    <div>
-      <dt>Stars</dt>
-      <dd><Star /> {number(owner.stars)}</dd>
-    </div>
-    <div>
-      <dt>Rank</dt>
-      <dd>
-        {#if data.rank && counted}
-          #{number(data.rank.rank)}
-          <span class="of">of {number(data.rank.of)} {noun}s, {top(data.rank.top)}</span>
-        {:else}
-          <span class="of">Not ranked yet</span>
-        {/if}
-      </dd>
-    </div>
-    <div>
-      <dt>Public repos</dt>
-      <dd>{number(owner.repos)}</dd>
-    </div>
-  </dl>
+{#snippet actions()}
+  <Actions login={owner.login} self={data.self} queued={form?.queued} />
+{/snippet}
 
+{#snippet aside()}
   {#if counted}
-    <Updated at={owner.refreshed_at * 1000} label="Stars counted" />
-  {:else}
+    <Badges login={owner.login} />
+  {/if}
+  {#if data.neighbours}
+    <Neighbours board={owner.kind ? 'organizations' : 'users'} {...data.neighbours} me={owner.id} />
+  {/if}
+  {#if data.self}<Forget login={owner.login} unsure={form?.unsure} />{/if}
+{/snippet}
+
+{#snippet footer()}
+  {#if data.schedule}<Schedule counted={owner.refreshed_at * 1000} {...data.schedule} />{/if}
+{/snippet}
+
+<Layout
+  avatarId={owner.id}
+  {title}
+  actions={data.user ? actions : undefined}
+  aside={side ? aside : undefined}
+  footer={data.schedule ? footer : undefined}
+>
+  {#if !counted}
     <p class="note">
       We've spotted this account in a search but haven't counted all its stars yet. It's near the
       front of the queue.
     </p>
   {/if}
 
-  {#if data.user}
-    <div class="actions">
-      {#if data.self}
-        <a class="button" href="/login?next=/{owner.login}" data-sveltekit-reload>
-          Refresh my stars
-        </a>
-      {:else}
-        <form method="POST" action="?/refresh">
-          <button class="button" type="submit">Ask for a refresh</button>
-        </form>
-        {#if form && 'queued' in form}
-          <p class="note" role="status">
-            {form.queued
-              ? "Queued. It'll be done within ten minutes or so."
-              : 'Counted recently, so it can wait.'}
-          </p>
-        {/if}
-      {/if}
-    </div>
-  {/if}
+  <Stats {owner} rank={data.rank} moved={data.moved} />
 
-  {#if counted}
-    <section class="badge" aria-labelledby="badge">
-      <h2 id="badge">Badge</h2>
-      <img src={badge} alt="git rank badge for {owner.login}" height="20" />
-      <p>For a README, either our own badge or the Shields one:</p>
-      <Copy text="[![git rank]({badge})]({profile})" label="our badge's Markdown" />
-      <Copy text="[![git rank]({shields})]({profile})" label="the Shields badge's Markdown" />
-    </section>
-  {/if}
-
-  <section class="repos" aria-labelledby="repos">
+  <section aria-labelledby="repos">
     <h2 id="repos">Repositories with 50+ stars</h2>
     {#if data.repos.length}
       <RankTable
@@ -124,79 +97,35 @@
     {/if}
   </section>
 
-  {#if data.self}
-    <section class="forget" aria-labelledby="forget">
-      <h2 id="forget">Remove me</h2>
-      <p>
-        This takes you off every ranking for good and stops us crawling your account. Your GitHub
-        account isn't touched.
-      </p>
-      <form method="POST" action="?/forget">
-        <label>
-          <input type="checkbox" name="sure" required />
-          Yes, remove {owner.login}
-        </label>
-        <button class="button danger" type="submit">Remove me</button>
-      </form>
-      {#if form && 'unsure' in form}<p class="note" role="alert">Tick the box first.</p>{/if}
-    </section>
+  {#if data.rank && data.spread}
+    <Spread
+      name={owner.login}
+      avatarId={owner.id}
+      stars={owner.stars}
+      {noun}
+      rank={data.rank}
+      {...data.spread}
+    />
   {/if}
-</article>
+
+  {#if data.repos.length}
+    <Portfolio {owner} repos={data.repos} languages={data.languages} />
+  {/if}
+
+  <QuickStats
+    {owner}
+    next={data.next}
+    milestone={data.milestone}
+    repos={data.repos}
+    languages={data.languages}
+    tiers={data.tiers}
+  />
+</Layout>
 
 <style>
-  .profile {
-    display: grid;
-    gap: var(--space-5);
-  }
-
-  .who {
-    display: flex;
-    align-items: center;
-    gap: var(--space-4);
-
-    img {
-      border-radius: 50%;
-      border: 1px solid var(--border);
-      background: var(--surface-hover);
-    }
-
-    h1 {
-      font-size: var(--text-2xl);
-      letter-spacing: -0.02em;
-      overflow-wrap: anywhere;
-    }
-  }
-
-  .kind {
-    color: var(--text-muted);
-  }
-
-  .stats {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-4) var(--space-6);
-    margin: 0;
-    padding-block: var(--space-4);
-    border-block: 1px solid var(--border);
-
-    dt {
-      color: var(--text-muted);
-      font-size: var(--text-sm);
-    }
-
-    dd {
-      margin: 0;
-      font-size: var(--text-xl);
-      font-weight: 700;
-      font-variant-numeric: tabular-nums;
-    }
-  }
-
-  .of {
-    display: block;
-    font-size: var(--text-sm);
-    font-weight: 400;
-    color: var(--text-muted);
+  .name {
+    color: var(--text);
+    font-weight: 600;
   }
 
   .note {
@@ -204,49 +133,9 @@
     max-width: var(--measure);
   }
 
-  .actions {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-3);
-  }
-
-  .button {
-    display: inline-block;
-    padding: var(--space-2) var(--space-4);
-    font: inherit;
-    font-weight: 600;
-    font-size: var(--text-sm);
-    color: var(--text);
-    text-decoration: none;
-    background: var(--surface-raised);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius);
-    cursor: pointer;
-
-    &:hover {
-      background: var(--surface-hover);
-    }
-
-    &.danger {
-      color: var(--danger);
-    }
-  }
-
   section {
     display: grid;
     gap: var(--space-3);
     min-width: 0;
-
-    h2 {
-      font-size: var(--text-xl);
-    }
-  }
-
-  .forget form {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-3);
   }
 </style>

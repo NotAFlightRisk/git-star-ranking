@@ -1,7 +1,7 @@
 import { error, redirect } from '@sveltejs/kit';
-import { standing } from '#lib/server/boards.ts';
 import { findOwner, findRepo } from '#lib/server/db.ts';
 import { settings } from '#lib/server/config.ts';
+import { details } from '#lib/server/repo.ts';
 
 export const load = async ({ params }) => {
   const owner = await findOwner(params.login);
@@ -12,5 +12,5 @@ export const load = async ({ params }) => {
   if (owner.login !== params.login || repo.name !== params.repo) {
     redirect(301, `/${owner.login}/${repo.name}`);
   }
-  return { owner, repo, rank: await standing('repositories', repo.stars) };
+  return { owner, repo, ...(await details(owner, repo)) };
 };

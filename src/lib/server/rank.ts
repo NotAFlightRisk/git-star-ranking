@@ -15,17 +15,74 @@ export function histogram(counts: { stars: number; n: number }[]): Histogram {
   return { stars: counts.map(({ stars }) => stars), above, total };
 }
 
-/** Competition ranking: ties share a rank and the next one skips, so 1, 2, 2, 4 */
-export function rankOf({ stars, above, total }: Histogram, count: number) {
+// binary search for the first index that passes, given everything after it passes too
+function first(length: number, passes: (i: number) => boolean) {
   let low = 0;
-  let high = stars.length;
+  let high = length;
   while (low < high) {
     const middle = (low + high) >> 1;
-    if (stars[middle] > count) low = middle + 1;
-    else high = middle;
+    if (passes(middle)) high = middle;
+    else low = middle + 1;
   }
-  return 1 + (above[low] ?? total);
+  return low;
 }
+
+const place = (stars: number[], count: number) => first(stars.length, (i) => stars[i] <= count);
+
+/** Competition ranking: ties share a rank and the next one skips, so 1, 2, 2, 4 */
+export const rankOf = ({ stars, above, total }: Histogram, count: number) =>
+  1 + (above[place(stars, count)] ?? total);
+
+/** How many sit at this count or above */
+export const atLeast = (histogram: Histogram, count: number) => rankOf(histogram, count - 1) - 1;
+
+/** The next count up from this one, and the rank it would bring */
+export function nextUp({ stars, above }: Histogram, count: number) {
+  const at = place(stars, count);
+  return at ? { stars: stars[at - 1], rank: 1 + above[at - 1] } : undefined;
+}
+
+/** The fewest stars that still make the top share, so where "top 1%" starts */
+export function starsFor({ stars, above, total }: Histogram, share: number) {
+  const rank = Math.max(1, Math.floor(share * total));
+  return stars[first(stars.length, (i) => above[i] >= rank) - 1];
+}
+
+const GRADES = [90, 80, 70, 60, 50, 40, 30, 20, 10, 1, 0.1, 0.01, 0.001];
+
+/** The next "top X%" up from this count and where it starts, if the board's big enough for it */
+export function milestone(histogram: Histogram, count: number) {
+  const within = (percent: number) => Math.floor((percent / 100) * histogram.total);
+  const rank = rankOf(histogram, count);
+  const percent = GRADES.find((grade) => rank > within(grade));
+  if (!percent || within(percent) < 1) return undefined;
+  return { percent, stars: starsFor(histogram, percent / 100) };
+}
+
+const STEPS = [1, 1.6, 2.5, 4, 6.3];
+
+/** Accounts counted in even steps on a log scale: 1, 2, 3, 4, 6, 10, 16, 25, 40, 63, 100... */
+export function bands(histogram: Histogram) {
+  if (!histogram.total) return [];
+  const [most, least] = [histogram.stars[0], histogram.stars.at(-1)!];
+  const edges: number[] = [];
+  for (let scale = 1; !edges.length || edges.at(-1)! <= most; scale *= 10) {
+    edges.push(...STEPS.map((step) => Math.round(step * scale)));
+  }
+  const between = (from: number, to: number) => atLeast(histogram, from) - atLeast(histogram, to);
+  return edges
+    .slice(0, -1)
+    .map((from, i) => ({ from, to: edges[i + 1], count: between(from, edges[i + 1]) }))
+    .filter(({ from, to }) => to > least && from <= most);
+}
+
+const SHARES = [0.5, 0.1, 0.01, 0.001];
+
+/** Where "top 50%" and the like start, leaving out any too fine for a board this size */
+export const marks = (histogram: Histogram) =>
+  SHARES.filter((share) => share * histogram.total >= 1)
+    .map((share) => ({ share, stars: starsFor(histogram, share) }))
+    .filter((mark, i, all) => mark.stars !== all[i - 1]?.stars);
 
 /** Ranks a list that's already sorted most stars first, the same way */
 export function competition<T extends { stars: number }>(rows: T[]) {

@@ -1,8 +1,8 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { waitUntil } from 'cloudflare:workers';
-import { standing } from '#lib/server/boards.ts';
 import { lookup } from '#lib/server/crawl.ts';
-import { findOwner, forget, hurry, ownerRepos } from '#lib/server/db.ts';
+import { findOwner, forget, hurry } from '#lib/server/db.ts';
+import { profile } from '#lib/server/profile.ts';
 import { endSession } from '#lib/server/session.ts';
 
 export const load = async ({ params, locals }) => {
@@ -15,17 +15,7 @@ export const load = async ({ params, locals }) => {
   if (!owner) error(404, `We don't have "${params.login}" yet.`);
   if (owner.login !== params.login) redirect(301, `/${owner.login}`);
   waitUntil(hurry(owner));
-  const [repos, rank] = await Promise.all([
-    ownerRepos(owner.id),
-    standing(owner.kind ? 'organizations' : 'users', owner.stars)
-  ]);
-  const ranked = await Promise.all(
-    repos.map(async (repo) => ({
-      ...repo,
-      rank: (await standing('repositories', repo.stars))?.rank
-    }))
-  );
-  return { owner, repos: ranked, rank, self: locals.user?.id === owner.id };
+  return { owner, ...(await profile(owner)), self: locals.user?.id === owner.id };
 };
 
 export const actions = {

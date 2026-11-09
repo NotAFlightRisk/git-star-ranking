@@ -74,6 +74,40 @@ describe('viewer', () => {
     vi.unstubAllGlobals();
   });
 
+  it("keeps the name, join date and followers, and each repo's details", async () => {
+    const node = {
+      databaseId: 9,
+      name: 'cli',
+      stargazerCount: 80,
+      description: null,
+      primaryLanguage: { name: 'Go' },
+      createdAt: '2015-03-01T00:00:00Z',
+      forkCount: 12,
+      isArchived: true,
+      licenseInfo: { spdxId: 'NOASSERTION' }
+    };
+    const repositories = { totalCount: 1, pageInfo: { hasNextPage: false }, nodes: [node] };
+    const answer = {
+      __typename: 'User',
+      databaseId: 1,
+      login: 'octo',
+      name: ' The Octocat ',
+      createdAt: '2011-01-25T18:44:36Z',
+      followers: { totalCount: 42 },
+      repositories
+    };
+    vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ data: { viewer: answer } })));
+    const me = await viewer('token');
+    expect(me).toMatchObject({ name: 'The Octocat', followers: 42, joined: 1_295_981_076 });
+    expect(me.list[0]).toMatchObject({
+      created: 1_425_168_000,
+      forks: 12,
+      archived: true,
+      license: 'Other'
+    });
+    vi.unstubAllGlobals();
+  });
+
   it.each([
     ['hangs', () => Promise.reject(new DOMException('aborted due to timeout', 'TimeoutError'))],
     ['cuts its answer short', async () => new Response('{"data": {"vie')]
