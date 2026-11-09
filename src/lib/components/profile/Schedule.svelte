@@ -15,7 +15,7 @@
   );
 </script>
 
-<p>
+<p class="dotted">
   <span><Updated at={counted} label="Stars counted" inline /></span>
   <span>Recounted {often}</span>
   <span>
@@ -29,15 +29,7 @@
 
 <style>
   p {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0 var(--space-3);
     color: var(--text-muted);
     font-size: var(--text-sm);
-  }
-
-  span + span::before {
-    content: '·';
-    margin-inline-end: var(--space-3);
   }
 </style>

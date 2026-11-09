@@ -13,6 +13,9 @@ export interface OwnerRow {
   refreshed_at: number;
   due_at: number;
   missed: number;
+  name: string | null;
+  followers: number | null;
+  joined_at: number | null;
 }
 
 export interface RepoRow {
@@ -22,6 +25,7 @@ export interface RepoRow {
   stars: number;
   language: string | null;
   description: string | null;
+  created_at: number | null;
 }
 
 export const seconds = () => Math.floor(Date.now() / 1000);
@@ -29,21 +33,26 @@ export const seconds = () => Math.floor(Date.now() / 1000);
 const each = (column: number) => `json_extract(value, '$[${column}]')`;
 
 const UPSERT_REPOS = `
-  INSERT INTO repos (id, owner_id, name, stars, language, description)
-  SELECT ${[0, 1, 2, 3, 4, 5].map(each).join(', ')} FROM json_each(?1)
+  INSERT INTO repos (id, owner_id, name, stars, language, description, created_at)
+  SELECT ${[0, 1, 2, 3, 4, 5, 6].map(each).join(', ')} FROM json_each(?1)
   WHERE NOT EXISTS (SELECT 1 FROM owners WHERE id = ${each(1)} AND hidden = 1)
   ON CONFLICT (id) DO UPDATE SET owner_id = excluded.owner_id, name = excluded.name,
-    stars = excluded.stars, language = excluded.language, description = excluded.description
+    stars = excluded.stars, language = excluded.language, description = excluded.description,
+    created_at = excluded.created_at
   WHERE repos.stars <> excluded.stars OR repos.owner_id <> excluded.owner_id
     OR repos.name <> excluded.name COLLATE BINARY OR repos.language IS NOT excluded.language
-    OR repos.description IS NOT excluded.description`;
+    OR repos.description IS NOT excluded.description
+    OR repos.created_at IS NOT excluded.created_at`;
 
 const UPSERT_OWNERS = `
-  INSERT INTO owners (id, login, kind, stars, repos, refreshed_at, due_at)
-  SELECT ${[0, 1, 2, 3, 4].map(each).join(', ')}, ?2, ${each(5)} FROM json_each(?1) WHERE true
+  INSERT INTO owners (id, login, kind, stars, repos, refreshed_at, due_at, name, followers,
+    joined_at)
+  SELECT ${[0, 1, 2, 3, 4].map(each).join(', ')}, ?2, ${[5, 6, 7, 8].map(each).join(', ')}
+  FROM json_each(?1) WHERE true
   ON CONFLICT (id) DO UPDATE SET login = excluded.login, kind = excluded.kind,
     stars = excluded.stars, repos = excluded.repos, refreshed_at = excluded.refreshed_at,
-    due_at = excluded.due_at, missed = 0
+    due_at = excluded.due_at, name = excluded.name, followers = excluded.followers,
+    joined_at = excluded.joined_at, missed = 0
   WHERE owners.hidden = 0`;
 
 // a stub waits on its first refresh, biggest first, as due_at sorts below everyone else
@@ -81,12 +90,30 @@ export async function saveOwners(fetched: Owner[], gone: number[] = []) {
   const owners = fetched.map((owner) => {
     const stars = owner.list.reduce((sum, repo) => sum + repo.stars, 0);
     const due = now + Math.round(refreshDays(stars, tiers) * DAY * jitter());
-    return [owner.id, owner.login, owner.kind, stars, owner.repos, due];
+    return [
+      owner.id,
+      owner.login,
+      owner.kind,
+      stars,
+      owner.repos,
+      due,
+      owner.name,
+      owner.followers,
+      owner.joined
+    ];
   });
   const repos = fetched.flatMap((owner) =>
     owner.list
       .filter((repo) => repo.stars >= minStars)
-      .map((repo) => [repo.id, owner.id, repo.name, repo.stars, repo.language, repo.description])
+      .map((repo) => [
+        repo.id,
+        owner.id,
+        repo.name,
+        repo.stars,
+        repo.language,
+        repo.description,
+        repo.created
+      ])
   );
   const complete = fetched.filter((owner) => !owner.cursor).map((owner) => owner.id);
   const statements = [
@@ -115,7 +142,8 @@ export async function saveFound(found: Found[]) {
     repo.name,
     repo.stars,
     repo.language,
-    repo.description
+    repo.description,
+    repo.created
   ]);
   meterD1(
     await env.DB.batch([
@@ -179,8 +207,8 @@ export async function hurry(owner: OwnerRow, after = DAY) {
 export const findOwner = (login: string) =>
   one<OwnerRow>(
     sql(
-      `SELECT id, login, kind, stars, repos, refreshed_at, due_at, missed FROM owners
-       WHERE login = ? AND hidden = 0 ORDER BY refreshed_at DESC LIMIT 1`,
+      `SELECT id, login, kind, stars, repos, refreshed_at, due_at, missed, name, followers,
+       joined_at FROM owners WHERE login = ? AND hidden = 0 ORDER BY refreshed_at DESC LIMIT 1`,
       login
     )
   );
@@ -199,7 +227,7 @@ export async function portfolio(ownerId: number) {
   const [repos, languages, tiers] = meterD1(
     await env.DB.batch([
       sql(
-        `SELECT id, owner_id, name, stars, language, description FROM repos
+        `SELECT id, owner_id, name, stars, language, description, created_at FROM repos
          WHERE owner_id = ? ORDER BY stars DESC, id LIMIT 100`,
         ownerId
       ),
@@ -222,7 +250,7 @@ export async function portfolio(ownerId: number) {
 export const findRepo = (ownerId: number, name: string) =>
   one<RepoRow>(
     sql(
-      `SELECT id, owner_id, name, stars, language, description FROM repos
+      `SELECT id, owner_id, name, stars, language, description, created_at FROM repos
        WHERE owner_id = ? AND name = ? LIMIT 1`,
       ownerId,
       name
@@ -234,7 +262,8 @@ export async function forget(id: number) {
   meterD1(
     await env.DB.batch([
       env.DB.prepare(
-        `UPDATE owners SET hidden = 1, login = '', stars = 0, repos = 0, due_at = 9e15 WHERE id = ?`
+        `UPDATE owners SET hidden = 1, login = '', name = NULL, followers = NULL, joined_at = NULL,
+         stars = 0, repos = 0, due_at = 9e15 WHERE id = ?`
       ).bind(id),
       env.DB.prepare('DELETE FROM repos WHERE owner_id = ?').bind(id)
     ])
@@ -276,7 +305,7 @@ export async function search(query: string) {
   const [found, matched] = meterD1(await env.DB.batch([owners, repos]));
   return {
     owners: found.results as Pick<OwnerRow, 'id' | 'login' | 'kind' | 'stars'>[],
-    repos: matched.results as (Omit<RepoRow, 'owner_id'> & { login: string })[]
+    repos: matched.results as (Omit<RepoRow, 'owner_id' | 'created_at'> & { login: string })[]
   };
 }
 

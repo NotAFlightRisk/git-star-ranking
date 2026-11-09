@@ -10,7 +10,7 @@
   import Stats from '#lib/components/profile/Stats.svelte';
   import RankTable from '#lib/components/RankTable.svelte';
   import Seo from '#lib/components/Seo.svelte';
-  import { avatar, number } from '#lib/format.ts';
+  import { avatar, count, month, number } from '#lib/format.ts';
 
   const { data, form } = $props();
   const owner = $derived(data.owner);
@@ -22,7 +22,8 @@
     '@type': 'ProfilePage',
     mainEntity: {
       '@type': owner.kind ? 'Organization' : 'Person',
-      name: owner.login,
+      name: owner.name ?? owner.login,
+      alternateName: owner.name ? owner.login : undefined,
       url: `https://github.com/${owner.login}`,
       image: avatar(owner.id, 256)
     }
@@ -42,9 +43,11 @@
     <img src={avatar(owner.id, 192)} alt="" width="96" height="96" />
     <div class="title">
       <h1>{owner.login}</h1>
-      <p>
-        GitHub {noun} ·
-        <a href="https://github.com/{owner.login}" rel="external">View on GitHub</a>
+      <p class="dotted">
+        {#if owner.name}<span class="name">{owner.name}</span>{/if}
+        {#if owner.joined_at}<span>Joined {month(owner.joined_at * 1000)}</span>{/if}
+        {#if owner.followers !== null}<span>{count(owner.followers, 'follower')}</span>{/if}
+        <span><a href="https://github.com/{owner.login}" rel="external">View on GitHub</a></span>
       </p>
     </div>
     {#if data.user}
@@ -145,6 +148,11 @@
 
     p {
       color: var(--text-muted);
+    }
+
+    .name {
+      color: var(--text);
+      font-weight: 600;
     }
   }
 
