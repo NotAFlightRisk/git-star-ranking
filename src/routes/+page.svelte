@@ -1,6 +1,7 @@
 <script lang="ts">
   import RankTable from '#lib/components/RankTable.svelte';
   import Seo from '#lib/components/Seo.svelte';
+  import Star from '#lib/components/Star.svelte';
   import Updated from '#lib/components/Updated.svelte';
   import { BOARDS } from '#lib/format.ts';
 
@@ -28,7 +29,13 @@
 
 <section class="intro">
   <h1>Top GitHub users, organizations and repositories</h1>
-  <p>Unofficial GitHub star ranking on every public repo</p>
+  <div class="lede">
+    <p>Unofficial GitHub star ranking on every public repo</p>
+    <a class="star-us" href="https://github.com/NotAFlightRisk/git-star-ranking" rel="external">
+      <Star />
+      Star us on GitHub
+    </a>
+  </div>
   <form class="search" action="/search" role="search">
     <label for="home-search">GitHub username or repo</label>
     <div class="field">
@@ -77,11 +84,39 @@
       letter-spacing: -0.02em;
       max-width: 24ch;
     }
+  }
 
-    > p {
+  .lede {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-4);
+
+    p {
       color: var(--text-muted);
       font-size: var(--text-lg);
       max-width: var(--measure);
+    }
+  }
+
+  /* GitHub's own Star button, so it reads as the thing to press */
+  .star-us {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-3);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--text);
+    text-decoration: none;
+    background: var(--surface-raised);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+
+    &:hover {
+      color: var(--text);
+      background: var(--surface-hover);
+      border-color: var(--star);
     }
   }
 
