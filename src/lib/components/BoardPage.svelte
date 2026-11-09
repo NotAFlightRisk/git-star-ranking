@@ -1,7 +1,7 @@
 <script lang="ts">
   import { page } from '$app/state';
   import type { ComponentProps } from 'svelte';
-  import { BOARDS, number } from '#lib/format.ts';
+  import { BOARDS, boardPath, number } from '#lib/format.ts';
   import Language from './Language.svelte';
   import Pager from './Pager.svelte';
   import RankTable from './RankTable.svelte';
@@ -27,12 +27,7 @@
   const subject = $derived(
     data.language ? `${data.language} repositories` : info.label.toLowerCase()
   );
-  const href = (page: number) => {
-    const params = new URLSearchParams();
-    if (data.language) params.set('language', data.language.toLowerCase());
-    if (page > 1) params.set('page', String(page));
-    return `${info.path}${params.size ? `?${params}` : ''}`;
-  };
+  const href = (page: number) => boardPath(info.path, page, data.language);
   const repos = $derived(data.board === 'repositories');
   const summary = $derived.by(() => {
     if (data.language) return `The top 500 ${data.language} repositories, ranked by stars.`;

@@ -1,13 +1,19 @@
 <script lang="ts">
   import Language from '#lib/components/Language.svelte';
+  import Layout from '#lib/components/profile/Layout.svelte';
+  import Neighbours from '#lib/components/profile/Neighbours.svelte';
+  import Schedule from '#lib/components/profile/Schedule.svelte';
+  import Tile from '#lib/components/profile/Tile.svelte';
+  import Tiles from '#lib/components/profile/Tiles.svelte';
+  import Siblings from '#lib/components/repo/Siblings.svelte';
   import Seo from '#lib/components/Seo.svelte';
-  import Star from '#lib/components/Star.svelte';
-  import Updated from '#lib/components/Updated.svelte';
-  import { avatar, number, tidy, top } from '#lib/format.ts';
+  import { boardPath, month, number, percent, tidy, top } from '#lib/format.ts';
 
   const { data } = $props();
-  const { owner, repo } = $derived(data);
+  const { owner, repo, rank, language, siblings } = $derived(data);
   const full = $derived(`${owner.login}/${repo.name}`);
+  const counted = $derived(owner.refreshed_at > 0);
+  const share = $derived(owner.stars ? Math.min(repo.stars / owner.stars, 1) : 0);
   const schema = $derived({
     '@context': 'https://schema.org',
     '@type': 'SoftwareSourceCode',
@@ -15,129 +21,84 @@
     codeRepository: `https://github.com/${full}`,
     programmingLanguage: repo.language ?? undefined,
     description: tidy(repo.description) ?? undefined,
-    author: { '@type': owner.kind ? 'Organization' : 'Person', name: owner.login }
+    dateCreated: repo.created_at ? new Date(repo.created_at * 1000).toISOString() : undefined,
+    author: { '@type': owner.kind ? 'Organization' : 'Person', name: owner.name ?? owner.login }
   });
 </script>
 
 <Seo
   title="{full} GitHub stars and rank"
-  description="{full} has {number(repo.stars)} stars on GitHub{data.rank
-    ? `, ranked #${number(data.rank.rank)} of ${number(data.rank.of)} repositories`
+  description="{full} has {number(repo.stars)} stars on GitHub{rank
+    ? `, ranked #${number(rank.rank)} of ${number(rank.of)} repositories`
     : ''}.{repo.description ? ` ${tidy(repo.description)}` : ''}"
   {schema}
 />
 
-<article class="repo">
-  <header>
-    <h1>
-      <img src={avatar(owner.id, 96)} alt="" width="40" height="40" />
-      <span><a href="/{owner.login}">{owner.login}</a>/<wbr />{repo.name}</span>
-    </h1>
-    {#if repo.description}<p class="description">{tidy(repo.description)}</p>{/if}
-  </header>
-
-  <dl class="stats">
-    <div>
-      <dt>Stars</dt>
-      <dd><Star /> {number(repo.stars)}</dd>
-    </div>
-    <div>
-      <dt>Rank</dt>
-      <dd>
-        {#if data.rank}
-          #{number(data.rank.rank)}
-          <span class="of">of {number(data.rank.of)} repositories, {top(data.rank.top)}</span>
-        {:else}
-          <span class="of">Not ranked yet</span>
-        {/if}
-      </dd>
-    </div>
+{#snippet title()}
+  <h1><a href="/{owner.login}">{owner.login}</a>/<wbr />{repo.name}</h1>
+  {#if repo.description}<p class="description">{tidy(repo.description)}</p>{/if}
+  <p class="dotted">
+    {#if owner.name}<span>by <a href="/{owner.login}">{owner.name}</a></span>{/if}
     {#if repo.language}
-      <div>
-        <dt>Language</dt>
-        <dd class="plain">
-          <a href="/repositories?language={encodeURIComponent(repo.language.toLowerCase())}">
-            <Language name={repo.language} />
-          </a>
-        </dd>
-      </div>
+      <span>
+        <a href={boardPath('/repositories', 1, repo.language)}><Language name={repo.language} /></a>
+      </span>
     {/if}
-  </dl>
+    {#if repo.created_at}<span>Created {month(repo.created_at * 1000)}</span>{/if}
+    <span><a href="https://github.com/{full}" rel="external">View on GitHub</a></span>
+  </p>
+{/snippet}
 
-  <Updated at={owner.refreshed_at ? owner.refreshed_at * 1000 : undefined} label="Stars counted" />
-  <p><a href="https://github.com/{full}" rel="external">View {full} on GitHub</a></p>
-</article>
+{#snippet aside()}
+  {#if data.neighbours}
+    <Neighbours board="repositories" {...data.neighbours} me={repo.id} />
+  {/if}
+  {#if siblings.rows.length}
+    <Siblings login={owner.login} name={repo.name} {...siblings} />
+  {/if}
+{/snippet}
+
+{#snippet footer()}
+  {#if data.schedule}<Schedule counted={owner.refreshed_at * 1000} {...data.schedule} />{/if}
+{/snippet}
+
+<Layout
+  avatarId={owner.id}
+  {title}
+  aside={data.neighbours || siblings.rows.length ? aside : undefined}
+  footer={data.schedule ? footer : undefined}
+>
+  <Tiles>
+    <Tile label="Stars" value={number(repo.stars)} star>
+      {#if counted && share}{percent(share)} of {owner.login}'s stars{/if}
+    </Tile>
+    <Tile label="Rank" value={rank ? `#${number(rank.rank)}` : 'Not yet'}>
+      {#if rank}
+        of {number(rank.of)} repos, <strong>{top(rank.top)}</strong>
+      {:else}
+        Ranked after the next snapshot
+      {/if}
+    </Tile>
+    {#if language}
+      <Tile label="In {language.name}" value="#{number(language.rank.rank)}">
+        of {number(language.rank.of)} repos, <strong>{top(language.rank.top)}</strong>
+      </Tile>
+    {/if}
+  </Tiles>
+</Layout>
 
 <style>
-  .repo {
-    display: grid;
-    gap: var(--space-5);
+  h1 a {
+    font-weight: 400;
+    text-decoration: none;
 
-    header {
-      display: grid;
-      gap: var(--space-2);
-    }
-
-    h1 {
-      display: flex;
-      align-items: center;
-      gap: var(--space-3);
-      font-size: var(--text-2xl);
-      letter-spacing: -0.02em;
-      overflow-wrap: break-word;
-
-      img {
-        flex: none;
-        border-radius: 50%;
-      }
-
-      a {
-        font-weight: 400;
-        text-decoration: none;
-
-        &:hover {
-          text-decoration: underline;
-        }
-      }
+    &:hover {
+      text-decoration: underline;
     }
   }
 
   .description {
-    color: var(--text-muted);
     font-size: var(--text-lg);
     max-width: var(--measure);
-  }
-
-  .stats {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-4) var(--space-6);
-    margin: 0;
-    padding-block: var(--space-4);
-    border-block: 1px solid var(--border);
-
-    dt {
-      color: var(--text-muted);
-      font-size: var(--text-sm);
-    }
-
-    dd {
-      margin: 0;
-      font-size: var(--text-xl);
-      font-weight: 700;
-      font-variant-numeric: tabular-nums;
-
-      &.plain {
-        font-size: var(--text-base);
-        font-weight: 400;
-      }
-    }
-  }
-
-  .of {
-    display: block;
-    font-size: var(--text-sm);
-    font-weight: 400;
-    color: var(--text-muted);
   }
 </style>

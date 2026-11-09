@@ -1,36 +1,50 @@
 <script lang="ts">
-  import { avatar, BOARDS, number } from '#lib/format.ts';
+  import { avatar, BOARDS, boardPath, number } from '#lib/format.ts';
   import Star from '../Star.svelte';
 
-  interface Props {
-    board: 'users' | 'organizations';
-    page: number;
-    rows: { rank: number; id: number; login: string; stars: number }[];
-    me: number;
+  interface Row {
+    rank: number;
+    id: number;
+    login: string;
+    stars: number;
+    owner_id?: number;
+    name?: string;
   }
 
-  const { board, page, rows, me }: Props = $props();
+  interface Props {
+    board: (typeof BOARDS)[number]['key'];
+    page: number;
+    rows: Row[];
+    me: number;
+    language?: string;
+  }
+
+  const { board, page, rows, me, language }: Props = $props();
   const path = $derived(BOARDS.find(({ key }) => key === board)!.path);
+  const href = (row: Row) => `/${row.login}${row.name ? `/${row.name}` : ''}`;
 </script>
 
 <section aria-labelledby="nearby">
-  <h2 id="nearby">Nearby</h2>
+  <h2 id="nearby">Nearby{language ? ` in ${language}` : ''}</h2>
   <ol>
     {#each rows as row (row.id)}
       {@const mine = row.id === me}
+      {@const label = row.name ?? row.login}
       <li class:mine aria-current={mine ? 'true' : undefined}>
         <span class="rank">#{number(row.rank)}</span>
-        <img src={avatar(row.id)} alt="" width="24" height="24" loading="lazy" />
-        {#if mine}
-          <strong class="login">{row.login}</strong>
-        {:else}
-          <a class="login" href="/{row.login}">{row.login}</a>
-        {/if}
+        <img src={avatar(row.owner_id ?? row.id)} alt="" width="24" height="24" loading="lazy" />
+        <svelte:element
+          this={mine ? 'strong' : 'a'}
+          class="label"
+          href={mine ? undefined : href(row)}
+        >
+          {#if row.name}<span class="visually-hidden">{row.login}/</span>{/if}{label}
+        </svelte:element>
         <span class="stars"><Star /> {number(row.stars)}</span>
       </li>
     {/each}
   </ol>
-  <a class="more" href="{path}{page > 1 ? `?page=${page}` : ''}">See the full board</a>
+  <a class="more" href={boardPath(path, page, language)}>See the full board</a>
 </section>
 
 <style>
@@ -77,14 +91,14 @@
     background: var(--surface-hover);
   }
 
-  .login {
+  .label {
     overflow: hidden;
+    font-weight: 600;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  a.login {
-    font-weight: 600;
+  a.label {
     text-decoration: none;
 
     &:hover {

@@ -63,3 +63,11 @@ export const BOARDS = [
   { key: 'organizations', path: '/organizations', label: 'Organizations', noun: 'Organization' },
   { key: 'repositories', path: '/repositories', label: 'Repositories', noun: 'Repository' }
 ] as const;
+
+/** A board page's address, leaving out the first page and any language not asked for */
+export function boardPath(path: string, page = 1, language?: string | null) {
+  const params = new URLSearchParams();
+  if (language) params.set('language', language.toLowerCase());
+  if (page > 1) params.set('page', String(page));
+  return `${path}${params.size ? `?${params}` : ''}`;
+}

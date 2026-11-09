@@ -2,6 +2,7 @@
   import Actions from '#lib/components/profile/Actions.svelte';
   import Badges from '#lib/components/profile/Badges.svelte';
   import Forget from '#lib/components/profile/Forget.svelte';
+  import Layout from '#lib/components/profile/Layout.svelte';
   import Neighbours from '#lib/components/profile/Neighbours.svelte';
   import Portfolio from '#lib/components/profile/Portfolio.svelte';
   import QuickStats from '#lib/components/profile/QuickStats.svelte';
@@ -38,171 +39,84 @@
   {schema}
 />
 
-<article class="profile" class:side>
-  <header class="who">
-    <img src={avatar(owner.id, 192)} alt="" width="96" height="96" />
-    <div class="title">
-      <h1>{owner.login}</h1>
-      <p class="dotted">
-        {#if owner.name}<span class="name">{owner.name}</span>{/if}
-        {#if owner.joined_at}<span>Joined {month(owner.joined_at * 1000)}</span>{/if}
-        {#if owner.followers !== null}<span>{count(owner.followers, 'follower')}</span>{/if}
-        <span><a href="https://github.com/{owner.login}" rel="external">View on GitHub</a></span>
-      </p>
-    </div>
-    {#if data.user}
-      <Actions login={owner.login} self={data.self} queued={form?.queued} />
-    {/if}
-  </header>
+{#snippet title()}
+  <h1>{owner.login}</h1>
+  <p class="dotted">
+    {#if owner.name}<span class="name">{owner.name}</span>{/if}
+    {#if owner.joined_at}<span>Joined {month(owner.joined_at * 1000)}</span>{/if}
+    {#if owner.followers !== null}<span>{count(owner.followers, 'follower')}</span>{/if}
+    <span><a href="https://github.com/{owner.login}" rel="external">View on GitHub</a></span>
+  </p>
+{/snippet}
 
-  <div class="main">
-    {#if !counted}
-      <p class="note">
-        We've spotted this account in a search but haven't counted all its stars yet. It's near the
-        front of the queue.
-      </p>
-    {/if}
+{#snippet actions()}
+  <Actions login={owner.login} self={data.self} queued={form?.queued} />
+{/snippet}
 
-    <Stats {owner} rank={data.rank} />
+{#snippet aside()}
+  {#if counted}<Badges login={owner.login} />{/if}
+  {#if data.neighbours}
+    <Neighbours board={owner.kind ? 'organizations' : 'users'} {...data.neighbours} me={owner.id} />
+  {/if}
+  {#if data.self}<Forget login={owner.login} unsure={form?.unsure} />{/if}
+{/snippet}
 
-    <section aria-labelledby="repos">
-      <h2 id="repos">Repositories with 50+ stars</h2>
-      {#if data.repos.length}
-        <RankTable
-          rows={data.repos.map((repo) => ({ ...repo, rank: repo.rank ?? 0, login: owner.login }))}
-          caption="{owner.login}'s repositories with their overall rank"
-          heading="Repository"
-          owned
-        />
-      {:else}
-        <p class="note">None yet. Forks don't count, and smaller repos still add to the total.</p>
-      {/if}
-    </section>
+{#snippet footer()}
+  {#if data.schedule}<Schedule counted={owner.refreshed_at * 1000} {...data.schedule} />{/if}
+{/snippet}
 
-    {#if data.rank && data.spread}
-      <Spread {owner} rank={data.rank} {...data.spread} />
-    {/if}
+<Layout
+  avatarId={owner.id}
+  {title}
+  actions={data.user ? actions : undefined}
+  aside={side ? aside : undefined}
+  footer={data.schedule ? footer : undefined}
+>
+  {#if !counted}
+    <p class="note">
+      We've spotted this account in a search but haven't counted all its stars yet. It's near the
+      front of the queue.
+    </p>
+  {/if}
 
+  <Stats {owner} rank={data.rank} />
+
+  <section aria-labelledby="repos">
+    <h2 id="repos">Repositories with 50+ stars</h2>
     {#if data.repos.length}
-      <Portfolio {owner} repos={data.repos} languages={data.languages} />
+      <RankTable
+        rows={data.repos.map((repo) => ({ ...repo, rank: repo.rank ?? 0, login: owner.login }))}
+        caption="{owner.login}'s repositories with their overall rank"
+        heading="Repository"
+        owned
+      />
+    {:else}
+      <p class="note">None yet. Forks don't count, and smaller repos still add to the total.</p>
     {/if}
+  </section>
 
-    <QuickStats
-      {owner}
-      next={data.next}
-      milestone={data.milestone}
-      repos={data.repos}
-      languages={data.languages}
-      tiers={data.tiers}
-    />
-  </div>
-
-  {#if side}
-    <aside>
-      {#if counted}<Badges login={owner.login} />{/if}
-      {#if data.neighbours}
-        <Neighbours
-          board={owner.kind ? 'organizations' : 'users'}
-          {...data.neighbours}
-          me={owner.id}
-        />
-      {/if}
-      {#if data.self}<Forget login={owner.login} unsure={form?.unsure} />{/if}
-    </aside>
+  {#if data.rank && data.spread}
+    <Spread {owner} rank={data.rank} {...data.spread} />
   {/if}
 
-  {#if data.schedule}
-    <footer>
-      <Schedule counted={owner.refreshed_at * 1000} {...data.schedule} />
-    </footer>
+  {#if data.repos.length}
+    <Portfolio {owner} repos={data.repos} languages={data.languages} />
   {/if}
-</article>
+
+  <QuickStats
+    {owner}
+    next={data.next}
+    milestone={data.milestone}
+    repos={data.repos}
+    languages={data.languages}
+    tiers={data.tiers}
+  />
+</Layout>
 
 <style>
-  .profile {
-    display: grid;
-    gap: var(--space-6);
-    grid-template-areas: 'who' 'main' 'side' 'foot';
-  }
-
-  .who {
-    grid-area: who;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-4);
-
-    img {
-      width: clamp(4rem, 3rem + 4vw, 6rem);
-      height: auto;
-      border-radius: 50%;
-      border: 1px solid var(--border);
-      background: var(--surface-hover);
-    }
-
-    h1 {
-      font-size: var(--text-2xl);
-      letter-spacing: -0.02em;
-      overflow-wrap: anywhere;
-    }
-
-    p {
-      color: var(--text-muted);
-    }
-
-    .name {
-      color: var(--text);
-      font-weight: 600;
-    }
-  }
-
-  .title {
-    flex: 1 1 14rem;
-    display: grid;
-    gap: var(--space-1);
-    min-width: 0;
-  }
-
-  .main {
-    grid-area: main;
-    container-type: inline-size;
-    display: grid;
-    align-content: start;
-    gap: var(--space-7);
-    min-width: 0;
-  }
-
-  aside {
-    grid-area: side;
-    display: grid;
-    align-content: start;
-    gap: var(--space-6);
-    min-width: 0;
-    padding-block-start: var(--space-5);
-    border-block-start: 1px solid var(--border);
-
-    :global(h2) {
-      font-size: var(--text-lg);
-    }
-  }
-
-  @media (min-width: 64rem) {
-    .profile.side {
-      grid-template-columns: minmax(0, 1fr) 20rem;
-      grid-template-areas: 'who who' 'main side' 'foot foot';
-      column-gap: var(--space-6);
-    }
-
-    aside {
-      padding-block-start: 0;
-      padding-inline-start: var(--space-6);
-      border-block-start: 0;
-      border-inline-start: 1px solid var(--border);
-    }
-  }
-
-  footer {
-    grid-area: foot;
+  .name {
+    color: var(--text);
+    font-weight: 600;
   }
 
   .note {
@@ -214,9 +128,5 @@
     display: grid;
     gap: var(--space-3);
     min-width: 0;
-  }
-
-  .main h2 {
-    font-size: var(--text-xl);
   }
 </style>
