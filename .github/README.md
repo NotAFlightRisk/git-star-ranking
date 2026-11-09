@@ -11,6 +11,7 @@
   <summary>Contents</summary>
 
 - [About](#about)
+- [Leaderboard](#leaderboard)
 - [Badges](#badges)
 - [Usage](#usage)
   - [How it works](#how-it-works)
@@ -26,6 +27,16 @@
 An application which crawls GitHub, and ranks the top users, organisations and repositories based upon star count.
 
 Inspired by the original [gitstar-ranking](https://github.com/k0kubun/gitstar-ranking) by [@k0kubun](https://github.com/k0kubun).
+
+---
+
+## Leaderboard
+
+<!-- prettier-ignore-start -->
+<!-- leaderboard-start -->
+
+<!-- leaderboard-end -->
+<!-- prettier-ignore-end -->
 
 ---
 

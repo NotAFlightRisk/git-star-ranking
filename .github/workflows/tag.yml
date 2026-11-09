@@ -1,4 +1,4 @@
-name: 🏷️ Tag
+name: 🔖 Tag
 
 on:
   push:
@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   tag:
-    name: 🏷️ Next tag
+    name: 🔖 Next tag
     runs-on: ubuntu-latest
     permissions:
       contents: write
