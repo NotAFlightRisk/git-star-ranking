@@ -32,28 +32,45 @@ export const seconds = () => Math.floor(Date.now() / 1000);
 
 const each = (column: number) => `json_extract(value, '$[${column}]')`;
 
-const UPSERT_REPOS = `
-  INSERT INTO repos (id, owner_id, name, stars, language, description, created_at)
-  SELECT ${[0, 1, 2, 3, 4, 5, 6].map(each).join(', ')} FROM json_each(?1)
-  WHERE NOT EXISTS (SELECT 1 FROM owners WHERE id = ${each(1)} AND hidden = 1)
-  ON CONFLICT (id) DO UPDATE SET owner_id = excluded.owner_id, name = excluded.name,
-    stars = excluded.stars, language = excluded.language, description = excluded.description,
-    created_at = excluded.created_at
-  WHERE repos.stars <> excluded.stars OR repos.owner_id <> excluded.owner_id
-    OR repos.name <> excluded.name COLLATE BINARY OR repos.language IS NOT excluded.language
-    OR repos.description IS NOT excluded.description
-    OR repos.created_at IS NOT excluded.created_at`;
+// each repo the crawl hands over, in this order, unless its owner has asked to be left out
+const REPO = ['id', 'owner_id', 'name', 'stars', 'language', 'description', 'created_at'];
+const INCOMING = `(SELECT ${REPO.map((column, i) => `${each(i)} AS ${column}`).join(', ')}
+  FROM json_each(?1) WHERE NOT EXISTS (SELECT 1 FROM owners WHERE id = ${each(1)} AND hidden = 1)
+) AS new`;
+
+// D1 bills a row for each index a SET touches, changed or not, so columns go in index groups
+function updateRepos(columns: string[]) {
+  const set = columns.map((column) => `${column} = new.${column}`);
+  const changed = columns.map((column) => `repos.${column} IS NOT new.${column} COLLATE BINARY`);
+  return `UPDATE repos SET ${set.join(', ')} FROM ${INCOMING}
+    WHERE repos.id = new.id AND (${changed.join(' OR ')})`;
+}
+
+/** New repos, then only what changed: stars most days, the rest hardly ever */
+const REPO_WRITES = [
+  `INSERT INTO repos (${REPO.join(', ')}) SELECT * FROM ${INCOMING} WHERE true
+   ON CONFLICT (id) DO NOTHING`,
+  updateRepos(['stars']),
+  updateRepos(['owner_id', 'name', 'language']),
+  updateRepos(['description', 'created_at'])
+];
 
 const UPSERT_OWNERS = `
   INSERT INTO owners (id, login, kind, stars, repos, refreshed_at, due_at, name, followers,
     joined_at)
   SELECT ${[0, 1, 2, 3, 4].map(each).join(', ')}, ?2, ${[5, 6, 7, 8].map(each).join(', ')}
   FROM json_each(?1) WHERE true
-  ON CONFLICT (id) DO UPDATE SET login = excluded.login, kind = excluded.kind,
-    stars = excluded.stars, repos = excluded.repos, refreshed_at = excluded.refreshed_at,
-    due_at = excluded.due_at, name = excluded.name, followers = excluded.followers,
-    joined_at = excluded.joined_at, missed = 0
+  ON CONFLICT (id) DO UPDATE SET kind = excluded.kind, stars = excluded.stars,
+    repos = excluded.repos, refreshed_at = excluded.refreshed_at, due_at = excluded.due_at,
+    name = excluded.name, followers = excluded.followers, joined_at = excluded.joined_at,
+    missed = 0
   WHERE owners.hidden = 0`;
+
+// logins are indexed too, so a rename is the only time one's written
+const RENAME_OWNERS = `
+  UPDATE owners SET login = new.login
+  FROM (SELECT ${each(0)} AS id, ${each(1)} AS login FROM json_each(?1)) AS new
+  WHERE owners.id = new.id AND owners.hidden = 0 AND owners.login <> new.login COLLATE BINARY`;
 
 // a stub waits on its first refresh, biggest first, as due_at sorts below everyone else
 const STUB_OWNERS = `
@@ -80,6 +97,11 @@ export const many = async <T>(statement: D1PreparedStatement) =>
 
 export const one = async <T>(statement: D1PreparedStatement) =>
   (await many<T>(statement))[0] ?? null;
+
+const writeRepos = (repos: unknown[][]) => {
+  const json = JSON.stringify(repos);
+  return REPO_WRITES.map((text) => sql(text, json));
+};
 
 const jitter = () => 0.9 + Math.random() * 0.2;
 
@@ -116,9 +138,11 @@ export async function saveOwners(fetched: Owner[], gone: number[] = []) {
       ])
   );
   const complete = fetched.filter((owner) => !owner.cursor).map((owner) => owner.id);
+  const json = JSON.stringify(owners);
   const statements = [
-    sql(UPSERT_OWNERS, JSON.stringify(owners), now),
-    sql(UPSERT_REPOS, JSON.stringify(repos)),
+    sql(UPSERT_OWNERS, json, now),
+    sql(RENAME_OWNERS, json),
+    ...writeRepos(repos),
     sql(PRUNE_REPOS, JSON.stringify(complete), JSON.stringify(repos.map(([id]) => id)))
   ];
   if (gone.length) {
@@ -148,7 +172,7 @@ export async function saveFound(found: Found[]) {
   meterD1(
     await env.DB.batch([
       sql(STUB_OWNERS, JSON.stringify([...owners.values()])),
-      sql(UPSERT_REPOS, JSON.stringify(repos))
+      ...writeRepos(repos)
     ])
   );
 }
