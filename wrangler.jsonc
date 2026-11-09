@@ -40,5 +40,5 @@
     "OWNER_REPO_PAGES": "10",
     "STREAMS": "2"
   },
-  "routes": [{ "pattern": "git-star-ranking.peng.ly", "custom_domain": true }]
+  "routes": [{ "pattern": "git-star-ranking.com", "custom_domain": true }]
 }

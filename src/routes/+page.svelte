@@ -11,10 +11,10 @@
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     name: 'git-star-ranking',
-    url: 'https://git-star-ranking.peng.ly/',
+    url: 'https://git-star-ranking.com/',
     potentialAction: {
       '@type': 'SearchAction',
-      target: 'https://git-star-ranking.peng.ly/search?q={query}',
+      target: 'https://git-star-ranking.com/search?q={query}',
       'query-input': 'required name=query'
     }
   };

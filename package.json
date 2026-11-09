@@ -9,7 +9,7 @@
     "type": "git",
     "url": "git+https://github.com/NotAFlightRisk/git-star-ranking.git"
   },
-  "homepage": "https://git-star-ranking.peng.ly",
+  "homepage": "https://git-star-ranking.com",
   "engines": {
     "node": "^22.18.0 || >=24.0.0"
   },
