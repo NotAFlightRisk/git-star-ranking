@@ -42,6 +42,14 @@ export const top = (share: number) => {
   return `top ${Math.ceil(percent)}%`;
 };
 
+/** A week's movement on a board, from where an entry sat to where it sits now */
+export function trend({ from, to }: { from: number | null; to: number }) {
+  if (from === null) return 'New on the board this week';
+  const places = from - to;
+  if (!places) return 'Same place as a week ago';
+  return `${places > 0 ? 'Up' : 'Down'} ${count(Math.abs(places), 'place')} this week`;
+}
+
 /** GitHub's :emoji: shortcodes only mean something on GitHub, and a cut lands on a whole word.
  * Anything already at the limit is treated as cut, as older rows were chopped at exactly 200 */
 export function tidy(text: string | null | undefined, most = 200) {

@@ -1,6 +1,7 @@
 import {
   languageListing,
   listing,
+  movement,
   neighbours,
   position,
   readMeta,
@@ -66,6 +67,7 @@ export async function details(owner: OwnerRow, repo: RepoRow) {
       { on: local, rank: language?.rank.rank, language: language?.name },
       { on: latest && listing(latest, 'repositories'), rank: overall?.rank.rank }
     ]),
+    moved: overall ? await movement('repositories', repo.id) : undefined,
     siblings: family,
     schedule: owner.refreshed_at > 0 ? schedule(owner) : undefined
   };

@@ -6,10 +6,11 @@
     label: string;
     value: string;
     star?: boolean;
+    note?: string;
     children?: Snippet;
   }
 
-  const { label, value, star = false, children }: Props = $props();
+  const { label, value, star = false, note, children }: Props = $props();
 </script>
 
 <div>
@@ -19,6 +20,7 @@
     {value}
   </dd>
   {#if children}<dd>{@render children()}</dd>{/if}
+  {#if note}<dd>{note}</dd>{/if}
 </div>
 
 <style>

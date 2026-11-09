@@ -1,4 +1,4 @@
-import { listing, neighbours, position, readMeta, spread } from './boards.ts';
+import { listing, movement, neighbours, position, readMeta, spread } from './boards.ts';
 import { DAY, refreshDays, settings } from './config.ts';
 import { portfolio, seconds, type OwnerRow } from './db.ts';
 import { bands, marks, milestone, nextUp, rankOf } from './rank.ts';
@@ -32,6 +32,7 @@ export async function profile(owner: OwnerRow) {
     milestone: ranked && milestone(ranked, owner.stars),
     spread: ranked && { bands: bands(ranked), marks: marks(ranked) },
     neighbours: rank && near ? await neighbours(near, owner.id, rank.rank) : undefined,
+    moved: rank ? await movement(board, owner.id) : undefined,
     repos: repos.map((repo) => ({ ...repo, rank: all && rankOf(all, repo.stars) })),
     languages,
     tiers,

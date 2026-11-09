@@ -81,7 +81,7 @@
     </p>
   {/if}
 
-  <Stats {owner} rank={data.rank} />
+  <Stats {owner} rank={data.rank} moved={data.moved} />
 
   <section aria-labelledby="repos">
     <h2 id="repos">Repositories with 50+ stars</h2>

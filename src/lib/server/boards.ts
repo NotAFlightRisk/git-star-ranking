@@ -107,3 +107,22 @@ export async function neighbours<T extends OwnerEntry>(board: Listing, id: numbe
   const rows = around((await entries<T>(board.key, page)).rows, id);
   return rows && { page, rows };
 }
+
+/** Where an entry sits in two of a board's daily lists, counting from one */
+export function shift(now: number[], then: number[], id: number) {
+  const to = now.indexOf(id) + 1;
+  const from = then.indexOf(id) + 1;
+  return to ? { from: from || null, to } : undefined;
+}
+
+const WEEK = 7 * 86_400_000;
+const day = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+
+/** How far an entry has moved on its board since a week before the latest snapshot */
+export async function movement(board: Board, id: number) {
+  const latest = await readMeta();
+  if (!latest) return undefined;
+  const list = (ms: number) => cached<number[]>(`history/${board}/${day(ms)}`, latest.at);
+  const [now, then] = await Promise.all([list(latest.at), list(latest.at - WEEK)]);
+  return now && then ? shift(now, then, id) : undefined;
+}

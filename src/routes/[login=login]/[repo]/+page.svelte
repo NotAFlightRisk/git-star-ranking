@@ -11,7 +11,7 @@
   import Siblings from '#lib/components/repo/Siblings.svelte';
   import Seo from '#lib/components/Seo.svelte';
   import Toggle from '#lib/components/Toggle.svelte';
-  import { boardPath, count, month, number, percent, tidy, top } from '#lib/format.ts';
+  import { boardPath, count, month, number, percent, tidy, top, trend } from '#lib/format.ts';
 
   const { data } = $props();
   const { owner, repo, rank, spread, language, siblings } = $derived(data);
@@ -99,7 +99,11 @@
     <Tile label="Stars" value={number(repo.stars)} star>
       {#if counted && share}{percent(share)} of {owner.login}'s stars{/if}
     </Tile>
-    <Tile label="Rank" value={rank ? `#${number(rank.rank)}` : 'Not yet'}>
+    <Tile
+      label="Rank"
+      value={rank ? `#${number(rank.rank)}` : 'Not yet'}
+      note={data.moved && trend(data.moved)}
+    >
       {#if rank}
         of {number(rank.of)} repos, <strong>{top(rank.top)}</strong>
       {:else}

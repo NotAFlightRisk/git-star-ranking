@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { around, languageListing, listing } from '../../../src/lib/server/boards.ts';
+import { around, languageListing, listing, shift } from '../../../src/lib/server/boards.ts';
 import type { Meta } from '../../../src/lib/server/snapshot.ts';
 
 const rows = Array.from({ length: 10 }, (_, id) => ({ id }));
@@ -45,5 +45,22 @@ describe('listing', () => {
     });
     expect(languageListing(meta, 'Zig')).toBeUndefined();
     expect(languageListing(meta, null)).toBeUndefined();
+  });
+});
+
+describe('shift', () => {
+  const now = [5, 3, 9, 1];
+
+  it('gives where an entry was and where it is, counting from one', () => {
+    expect(shift(now, [3, 1, 5, 9], 9)).toEqual({ from: 4, to: 3 });
+    expect(shift(now, [5, 3, 9, 1], 5)).toEqual({ from: 1, to: 1 });
+  });
+
+  it("marks an entry that wasn't on the board a week ago", () => {
+    expect(shift(now, [3, 5], 9)).toEqual({ from: null, to: 3 });
+  });
+
+  it('has nothing for one that has dropped off', () => {
+    expect(shift(now, [7, 5], 7)).toBeUndefined();
   });
 });
