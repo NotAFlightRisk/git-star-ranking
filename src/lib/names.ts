@@ -29,3 +29,7 @@ export function subject(login: string, repo?: string): Subject | undefined {
 }
 
 export const pathOf = ({ login, repo }: Subject) => (repo ? `/${login}/${repo}` : `/${login}`);
+
+/** A builder's page, set up for an account or repo when there is one */
+export const builtFor = (page: string, target?: Subject) =>
+  target ? `${page}?for=${pathOf(target).slice(1)}` : page;

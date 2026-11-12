@@ -1,4 +1,4 @@
-import { pathOf, type Subject } from './names.ts';
+import { builtFor, pathOf, type Subject } from './names.ts';
 
 export type Kind = 'account' | 'repo';
 export type Show = 'rank' | 'language' | 'top' | 'stars';
@@ -52,21 +52,25 @@ export function hex(colour: string) {
 
 export const defaultLabel = (show: Show = 'rank') => (show === 'stars' ? 'stars' : 'git rank');
 
+/** A hex or named colour from a query, without its #, if it's one */
+export function readColour(text: string | null) {
+  const value = text?.toLowerCase().replace(/^#/, '');
+  return value && (HEX.test(value) || named(value)) ? value : undefined;
+}
+
+/** The first of the allowed values, unless the query asks for another of them */
+export const pick = <T extends string>(text: string | null, allowed: readonly T[]) =>
+  allowed.find((value) => value === text) ?? allowed[0];
+
 /** Badge options from a query, with anything unexpected left at its default */
 export function readBadge(query: Pick<URLSearchParams, 'get'>, kind: Kind): BadgeOptions {
-  const pick = <T extends string>(key: string, allowed: readonly T[]) =>
-    allowed.find((value) => value === query.get(key)) ?? allowed[0];
-  const colour = (key: string) => {
-    const value = query.get(key)?.toLowerCase().replace(/^#/, '');
-    return value && (HEX.test(value) || named(value)) ? value : undefined;
-  };
   const label = (query.get('label') ?? '').replace(/\p{C}/gu, '').trim();
   return {
-    show: pick('show', SHOWS[kind]),
-    style: pick('style', STYLES),
+    show: pick(query.get('show'), SHOWS[kind]),
+    style: pick(query.get('style'), STYLES),
     label: [...label].slice(0, 40).join('').trim() || undefined,
-    color: colour('color'),
-    labelColor: colour('labelColor'),
+    color: readColour(query.get('color')),
+    labelColor: readColour(query.get('labelColor')),
     icon: query.get('icon') === 'star' ? 'star' : undefined
   };
 }
@@ -96,8 +100,7 @@ export function badgeUrl(
   return `https://img.shields.io/endpoint?url=${encodeURIComponent(`${base}/shields${tail}`)}`;
 }
 
-export const builderPath = (target?: Subject) =>
-  target ? `/badge-builder?for=${pathOf(target).slice(1)}` : '/badge-builder';
+export const builderPath = (target?: Subject) => builtFor('/badge-builder', target);
 
 interface Embed {
   label: string;
