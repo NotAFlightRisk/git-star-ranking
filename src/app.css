@@ -16,6 +16,9 @@
   --on-accent: #ffffff;
   --star: #c48a00;
   --danger: #b42318;
+  --live: #1a7f37;
+  --late: #bc4c00;
+  --stale: #cf222e;
   --selection: #cfe0fa;
   --series-1: #2a78d6;
   --series-2: #eb6834;
@@ -58,6 +61,9 @@
     --on-accent: #0d1117;
     --star: #e3b341;
     --danger: #ff8a80;
+    --live: #3fb950;
+    --late: #db6d28;
+    --stale: #f85149;
     --selection: #1f3a5f;
     --series-1: #3987e5;
     --series-2: #d95926;
