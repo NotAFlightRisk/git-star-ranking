@@ -1,10 +1,9 @@
+import { SNAPSHOT_LATE } from '../freshness.ts';
 import { readMeta } from './boards.ts';
 import { oldestDue } from './db.ts';
 import { ALERT_AT, budget } from './usage.ts';
 
 const HOUR = 3_600_000;
-// snapshots land every six hours, so this is two in a row gone missing
-const SNAPSHOT_LATE = 13 * HOUR;
 // a day past due means the crawl isn't keeping up
 const CRAWL_LATE = 24 * HOUR;
 
