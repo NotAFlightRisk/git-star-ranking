@@ -5,17 +5,35 @@
   import Copy from '../Copy.svelte';
   import Toggle from '../Toggle.svelte';
 
+  type Theme = 'light' | 'dark';
+
   interface Props {
+    /** What it makes, for the heading */
+    noun?: string;
     /** What the snippet embeds */
     image?: string;
-    /** The same once typing settles, so it isn't fetched every keystroke */
-    preview?: string;
+    /** The same once typing settles, so it isn't fetched every keystroke. One for each
+     * background when the image follows the reader's theme, which this page can't fake */
+    preview?: string | Record<Theme, string>;
     alt: string;
     /** The account or repo it's for, which it links to */
     target?: Subject;
+    /** Wide images are shown one above the other */
+    wide?: boolean;
+    /** Whether the link can be left off */
+    optionalLink?: boolean;
   }
 
-  const { image, preview, alt, target }: Props = $props();
+  const {
+    noun = 'badge',
+    image,
+    preview,
+    alt,
+    target,
+    wide = false,
+    optionalLink = true
+  }: Props = $props();
+  const shown = (theme: Theme) => (typeof preview === 'string' ? preview : preview?.[theme]);
   const link = $derived(target && `${page.url.origin}${pathOf(target)}`);
   const small = $derived(target?.repo ? ' (repos need 50+ stars)' : '');
 
@@ -25,16 +43,18 @@
   }));
   let format = $state<Format>('markdown');
   let linked = $state(true);
-  const code = $derived(image && FORMATS[format].write(image, alt, linked ? link : undefined));
+  const code = $derived(
+    image && FORMATS[format].write(image, alt, linked || !optionalLink ? link : undefined)
+  );
 </script>
 
 <section class="output" aria-labelledby="output">
-  <h2 id="output">Your badge</h2>
-  <div class="previews">
-    {#each ['light', 'dark'] as theme (theme)}
+  <h2 id="output">Your {noun}</h2>
+  <div class="previews" class:wide>
+    {#each ['light', 'dark'] as const as theme (theme)}
       <div class="preview {theme}">
-        {#if preview}
-          <img src={preview} alt="The badge on a {theme} background" />
+        {#if shown(theme)}
+          <img src={shown(theme)} alt="{alt}, on a {theme} background" />
         {:else}
           <span>Shows here</span>
         {/if}
@@ -44,12 +64,14 @@
   {#if code && target}
     <div class="controls">
       <Toggle label="Format" options={formats} bind:value={format} />
-      <label class="checkbox">
-        <input type="checkbox" bind:checked={linked} disabled={format === 'url'} />
-        As link
-      </label>
+      {#if optionalLink}
+        <label class="checkbox">
+          <input type="checkbox" bind:checked={linked} disabled={format === 'url'} />
+          As link
+        </label>
+      {/if}
     </div>
-    <Copy text={code} label="the badge's {FORMATS[format].label}" />
+    <Copy text={code} label="the {noun}'s {FORMATS[format].label}" />
     <p class="hint">
       If it says "not found", we just haven't counted it yet{small}.
       {#if page.data.user}
@@ -86,6 +108,10 @@
     border: 1px solid var(--border);
     border-radius: var(--radius);
     overflow: hidden;
+
+    &.wide {
+      grid-template-columns: 1fr;
+    }
   }
 
   /* the backgrounds GitHub shows a README on, whatever this site's theme */

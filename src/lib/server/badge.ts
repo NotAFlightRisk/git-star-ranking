@@ -83,7 +83,7 @@ async function describe(url: URL, login: string, repo?: string) {
   return { drawn: draw(facts, options), seconds, headers };
 }
 
-const SVG = {
+export const SVG = {
   'content-type': 'image/svg+xml; charset=utf-8',
   // labels come from the URL, so nothing in one may run if opened directly
   'content-security-policy': "default-src 'none'",

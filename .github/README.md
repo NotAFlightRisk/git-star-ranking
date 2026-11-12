@@ -13,6 +13,7 @@
 - [About](#about)
 - [Leaderboard](#leaderboard)
 - [Badges](#badges)
+- [Widgets](#widgets)
 - [Usage](#usage)
   - [How it works](#how-it-works)
   - [Deployment](#deployment)
@@ -169,6 +170,42 @@ To have Shields draw it, swap `badge.svg` for `shields` and pass that to their e
 ```markdown
 ![git rank](https://img.shields.io/endpoint?url=https%3A%2F%2Fgit-star-ranking.com%2Fusers%2F<login>%2Fshields)
 ```
+
+---
+
+## Widgets
+
+The [profile widgets](https://git-star-ranking.com/profile-widgets) page makes bigger embeds for a profile README, or any repo's. They follow the reader's light or dark mode unless told otherwise.
+
+| Widget      | Shows                                                                             | For             |
+| ----------- | --------------------------------------------------------------------------------- | --------------- |
+| `rank`      | Its rank, tier and a few facts beside it                                          | accounts, repos |
+| `headline`  | One line, the most impressive true thing we can say, like "#3 Rust repo"          | accounts, repos |
+| `trophies`  | A trophy for each of stars, a big repo, rank, a language board and a week's climb | accounts, repos |
+| `star-map`  | Its repos as tiles sized by stars, coloured by language                           | accounts        |
+| `podium`    | Its top three repos, each with its best place                                     | accounts        |
+| `languages` | Its best place on each language's board, where it's in the top 1,000              | accounts        |
+
+```markdown
+[![GitHub star rank](https://git-star-ranking.com/users/<login>/rank.svg)](https://git-star-ranking.com/<login>)
+[![GitHub stars headline](https://git-star-ranking.com/repositories/<owner>/<repo>/headline.svg)](https://git-star-ranking.com/<owner>/<repo>)
+```
+
+Accounts only show a rank from 1,000 stars. Below that, we may not yet have found every account above them, so they lead with their stars instead. Every repo with 50+ stars is ranked, overall and among the 30 biggest languages.
+
+Add any of these to the query:
+
+| Param    | Values                                                    | Default     |
+| -------- | --------------------------------------------------------- | ----------- |
+| `layout` | `card` or `strip`, for `rank`                             | `card`      |
+| `claim`  | `auto`, `rank`, `language` or `club`, for `headline`      | `auto`      |
+| `theme`  | `auto`, `light` or `dark`                                 | `auto`      |
+| `accent` | hex without the `#`, or a Shields colour name             | blue        |
+| `bg`     | a background colour, which the text picks colours to suit | the theme's |
+| `border` | `none` to leave it off                                    | shown       |
+| `radius` | corner rounding, `0` to `16`                              | `6`         |
+
+Widgets only use what we've already counted, and are cached for six hours.
 
 ---
 

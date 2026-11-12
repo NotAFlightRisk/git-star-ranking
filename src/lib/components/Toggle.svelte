@@ -3,13 +3,14 @@
     label: string;
     options: { value: T; label: string; title?: string }[];
     value: T;
+    disabled?: boolean;
   }
 
-  let { label, options, value = $bindable() }: Props = $props();
+  let { label, options, value = $bindable(), disabled = false }: Props = $props();
   const name = $props.id();
 </script>
 
-<fieldset>
+<fieldset {disabled}>
   <legend class="visually-hidden">{label}</legend>
   {#each options as option (option.value)}
     <label title={option.title}>
@@ -53,6 +54,11 @@
     &:has(:focus-visible) {
       outline: 2px solid var(--accent);
       outline-offset: 1px;
+    }
+
+    &:has(:disabled) {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
   }
 

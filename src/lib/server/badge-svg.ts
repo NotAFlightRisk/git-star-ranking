@@ -16,7 +16,8 @@ const VERDANA = 'Verdana,Geneva,DejaVu Sans,sans-serif';
 const HELVETICA = 'Helvetica Neue,Helvetica,Arial,sans-serif';
 const ICON = 14;
 
-const escape = (text: string) => text.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
+export const escape = (text: string) =>
+  text.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
 
 /** Text and shadow colours that read on a background, as Shields picks them */
 function ink(background: string) {

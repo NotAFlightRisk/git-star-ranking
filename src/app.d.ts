@@ -9,6 +9,7 @@ declare global {
       CRAWL: Queue<Job>;
       POOL: DurableObjectNamespace<TokenPool>;
       SNAPSHOTS?: R2Bucket;
+      ASSETS?: { fetch(input: string): Promise<Response> };
       APP_URL: string;
       ADMINS: string;
       REPO_MIN_STARS: string;

@@ -19,7 +19,13 @@ export function memoryD1() {
   });
   return {
     db,
-    prepare: (text: string) => ({ bind: (...values: SQLInputValue[]) => ({ text, values }) }),
+    prepare: (text: string) => ({
+      bind: (...values: SQLInputValue[]) => ({
+        text,
+        values,
+        all: async () => run({ text, values })
+      })
+    }),
     async batch(statements: Statement[]) {
       db.exec('BEGIN');
       try {
