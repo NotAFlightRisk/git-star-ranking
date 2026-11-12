@@ -32,7 +32,7 @@
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TokenPool"] }],
   "triggers": { "crons": ["*/10 * * * *", "17 */6 * * *"] },
   "vars": {
-    "APP_URL": "https://git-star-ranking.peng.ly",
+    "APP_URL": "https://git-star-ranking.com",
     "ADMINS": "NotAFlightRisk",
     "REPO_MIN_STARS": "50",
     "REFRESH_TIERS": "1000:1,100:7,0:30",
