@@ -1,6 +1,7 @@
 <script lang="ts">
   import Actions from '#lib/components/profile/Actions.svelte';
   import Badges from '#lib/components/profile/Badges.svelte';
+  import Embed from '#lib/components/profile/Embed.svelte';
   import Forget from '#lib/components/profile/Forget.svelte';
   import Layout from '#lib/components/profile/Layout.svelte';
   import Neighbours from '#lib/components/profile/Neighbours.svelte';
@@ -120,6 +121,8 @@
     languages={data.languages}
     tiers={data.tiers}
   />
+
+  {#if counted}<Embed target={{ login: owner.login }} />{/if}
 </Layout>
 
 <style>

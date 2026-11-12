@@ -1,6 +1,7 @@
 <script lang="ts">
   import Language from '#lib/components/Language.svelte';
   import Badges from '#lib/components/profile/Badges.svelte';
+  import Embed from '#lib/components/profile/Embed.svelte';
   import Layout from '#lib/components/profile/Layout.svelte';
   import Neighbours from '#lib/components/profile/Neighbours.svelte';
   import Schedule from '#lib/components/profile/Schedule.svelte';
@@ -136,6 +137,8 @@
     club={data.club}
     yearly={data.yearly}
   />
+
+  {#if rank}<Embed target={{ login: owner.login, repo: repo.name }} />{/if}
 </Layout>
 
 <style>
