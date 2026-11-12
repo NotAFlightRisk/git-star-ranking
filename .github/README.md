@@ -164,12 +164,6 @@ Add any of these to the query:
 | `color`, `labelColor` | hex without the `#`, or a Shields colour name               | blue, and dark grey |
 | `icon`                | `star`                                                      | none                |
 
-To have Shields draw it, swap `badge.svg` for `shields` and pass that to their endpoint badge:
-
-```markdown
-![git rank](https://img.shields.io/endpoint?url=https%3A%2F%2Fgit-star-ranking.com%2Fusers%2F<login>%2Fshields)
-```
-
 ---
 
 ## Usage
