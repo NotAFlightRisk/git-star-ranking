@@ -21,7 +21,7 @@
   <img src={badgeUrl('', target)} alt="{alt} badge for {pathOf(target).slice(1)}" height="20" />
   <p>Put this rank in a README with the Markdown below.</p>
   <Copy text={markdown} label="the badge's Markdown" />
-  <a href={builderPath(target)}>Customise it in the badge builder</a>
+  <a href={builderPath(target)} rel="nofollow">Customise it in the badge builder</a>
 </section>
 
 <style>
