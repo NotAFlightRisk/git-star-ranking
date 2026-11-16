@@ -22,8 +22,8 @@
     </p>
     <p>
       Ties share a rank, so two accounts on the same count are both 7th and the next one is 9th.
-      Users and organizations are ranked separately. The tables list the top 5,000 of each, 50 to a
-      page, and every profile shows its rank and how near the top it sits, wherever that is.
+      Users and organizations are ranked separately. The tables list the top 10,000 of each, 100 to
+      a page, and every profile shows its rank and how near the top it sits, wherever that is.
     </p>
   </section>
 
