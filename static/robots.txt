@@ -6,4 +6,29 @@ Disallow: /search
 Disallow: /badge-builder?
 Disallow: /users/
 Disallow: /repositories/
+
+# Also feeds the Yep search engine
+User-agent: AhrefsBot
+Crawl-delay: 20
+Disallow: /admin
+Disallow: /login
+Disallow: /auth/
+Disallow: /search
+Disallow: /badge-builder?
+Disallow: /users/
+Disallow: /repositories/
+
+# Crawlers for AI training and SEO tools, as opposed to search
+User-agent: GPTBot
+User-agent: ClaudeBot
+User-agent: GoogleOther
+User-agent: Amazonbot
+User-agent: SemrushBot
+User-agent: MJ12bot
+User-agent: DotBot
+User-agent: serpstatbot
+User-agent: DataForSeoBot
+User-agent: BLEXBot
+Disallow: /
+
 Sitemap: https://git-star-ranking.com/sitemap.xml
