@@ -234,6 +234,17 @@ export async function writeState(key: string, value: unknown) {
   );
 }
 
+/** Marks a sweep done, unless a newer one has taken its place */
+export const finishSweep = async (id: string, at: number) =>
+  meterD1(
+    await sql(
+      `UPDATE state SET value = json_set(value, '$.done', ?2)
+       WHERE key = 'sweep' AND json_extract(value, '$.id') = ?1`,
+      id,
+      at
+    ).run()
+  );
+
 /** Pushes an owner to the front of the refresh queue, once per refresh */
 export async function hurry(owner: OwnerRow, after = DAY) {
   if (owner.due_at <= 0 || seconds() - owner.refreshed_at < after) return false;
