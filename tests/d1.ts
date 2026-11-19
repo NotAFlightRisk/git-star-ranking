@@ -6,7 +6,7 @@ interface Statement {
   values: SQLInputValue[];
 }
 
-/** Just enough of D1 to run batches, on an in-memory SQLite with every migration applied */
+/** Just enough of D1 to run statements and batches, on an in-memory SQLite with every migration applied */
 export function memoryD1() {
   const db = new DatabaseSync(':memory:');
   const migrations = new URL('../migrations/', import.meta.url);
@@ -19,7 +19,12 @@ export function memoryD1() {
   });
   return {
     db,
-    prepare: (text: string) => ({ bind: (...values: SQLInputValue[]) => ({ text, values }) }),
+    prepare: (text: string) => ({
+      bind: (...values: SQLInputValue[]) => {
+        const statement = { text, values };
+        return { ...statement, run: async () => run(statement), all: async () => run(statement) };
+      }
+    }),
     async batch(statements: Statement[]) {
       db.exec('BEGIN');
       try {

@@ -4,6 +4,7 @@ import {
   addSlices,
   claim,
   due,
+  finishSweep,
   readState,
   retouch,
   saveFound,
@@ -180,10 +181,10 @@ export async function refreshDue(deadline: number) {
   }
 }
 
-async function tick(job: Job, sweep: Sweep) {
+async function tick(job: Job) {
   await sliceDone(job);
   const progress = await sweepProgress(job.sweep);
-  if (!progress?.left) await writeState('sweep', { ...sweep, done: Date.now() });
+  if (!progress?.left) await finishSweep(job.sweep, Date.now());
 }
 
 /** One search slice. Returns how long to wait if the pool says not yet */
@@ -204,7 +205,7 @@ export async function sweepSlice(job: Job) {
     await addSlices(halves);
     meter('queue_ops', 3 * halves.length);
     await env.CRAWL.sendBatch(halves.map((body) => ({ body })));
-    return tick(job, sweep);
+    return tick(job);
   }
   const pages = Math.min(10, Math.ceil(first.total / 100));
   const take = borrow('search', Math.max(pages - 1, 1));
@@ -216,7 +217,7 @@ export async function sweepSlice(job: Job) {
       page--;
     }
   }
-  return tick(job, sweep);
+  return tick(job);
 }
 
 /** Starts a sweep when the last one's old enough, and nudges one along that's gone quiet */
@@ -228,7 +229,7 @@ export async function maybeSweep(now = Date.now()) {
   if (progress?.slices) {
     if (seconds() - progress.touched < STALLED) return;
     const stuck = await retouch(sweep!.id, 100);
-    if (!stuck.length) return writeState('sweep', { ...sweep!, done: now });
+    if (!stuck.length) return finishSweep(sweep!.id, now);
     meter('queue_ops', 3 * stuck.length);
     await env.CRAWL.sendBatch(stuck.map((body) => ({ body })));
     return;

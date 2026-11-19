@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, vi } from 'vitest';
+import { memoryD1 } from '../../d1.ts';
 import { env } from '../../workers.ts';
-import { finish, pack } from '../../../src/lib/server/crawl.ts';
+import { finish, pack, sweepSlice } from '../../../src/lib/server/crawl.ts';
+import { addSlices, readState, writeState } from '../../../src/lib/server/db.ts';
 import type { Owner } from '../../../src/lib/server/github.ts';
+import { TOP, type Job } from '../../../src/lib/server/sweep.ts';
 
 describe('pack', () => {
   const owner = (repos: number, refreshed_at = 1) => ({ repos, refreshed_at });
@@ -106,5 +109,35 @@ describe('finish', () => {
     answer({ o0: lastPage, o1: null });
     const owners = await finish([big(1), big(2)], async () => ({ token: 't', wait: 0 }));
     expect(owners.map((owner) => owner.id)).toEqual([1]);
+  });
+});
+
+describe('sweepSlice', () => {
+  const job: Job = { type: 'slice', sweep: '1', min: 50, max: TOP };
+  const empty = { total_count: 0, incomplete_results: false, items: [] };
+
+  beforeEach(async () => {
+    Object.assign(env, {
+      DB: memoryD1(),
+      POOL: { getByName: () => ({ lease: async () => ({ token: 't', wait: 0 }) }) }
+    });
+    await addSlices([job]);
+    await writeState('sweep', { id: '1', started: 1 });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('marks the sweep done once its last slice is in', async () => {
+    vi.stubGlobal('fetch', async () => Response.json(empty));
+    await sweepSlice(job);
+    expect(await readState('sweep')).toMatchObject({ id: '1', done: expect.any(Number) });
+  });
+
+  it('leaves a sweep started while the last slice of the old one was running', async () => {
+    vi.stubGlobal('fetch', async () => {
+      await writeState('sweep', { id: '2', started: 2 });
+      return Response.json(empty);
+    });
+    await sweepSlice(job);
+    expect(await readState('sweep')).toEqual({ id: '2', started: 2 });
   });
 });
