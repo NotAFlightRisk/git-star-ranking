@@ -1,5 +1,15 @@
 const whole = new Intl.NumberFormat('en-GB');
 const compact = new Intl.NumberFormat('en-GB', { notation: 'compact', maximumFractionDigits: 1 });
+const rounded = {
+  short: new Intl.NumberFormat('en-GB', { notation: 'compact', maximumSignificantDigits: 2 }),
+  long: new Intl.NumberFormat('en-GB', {
+    notation: 'compact',
+    compactDisplay: 'long',
+    maximumSignificantDigits: 2
+  })
+};
+const marks = { short: '~', long: 'about ' };
+type Style = keyof typeof marks;
 const when = new Intl.DateTimeFormat('en-GB', {
   day: 'numeric',
   month: 'short',
@@ -24,7 +34,14 @@ const monthly = new Intl.DateTimeFormat('en-GB', {
 });
 
 export const number = (n: number) => whole.format(n);
-export const count = (n: number, noun: string) => `${number(n)} ${noun}${n === 1 ? '' : 's'}`;
+/** A number, rounded off and marked when it's only an estimate: ~2.8m, or about 2.8 million in prose */
+export const about = (n: number, rough = false, style: Style = 'short') =>
+  rough ? `${marks[style]}${rounded[style].format(n)}` : number(n);
+/** A rank, rounded off and marked the same way */
+export const place = (rank: number, rough = false, style: Style = 'short') =>
+  rough ? `${marks[style]}#${rounded[style].format(rank)}` : `#${number(rank)}`;
+export const count = (n: number, noun: string, rough = false, style: Style = 'short') =>
+  `${about(n, rough, style)} ${noun}${n === 1 ? '' : 's'}`;
 /** A share as a whole percent, without rounding a sliver down to nothing */
 export const percent = (share: number) =>
   share > 0 && share < 0.005 ? '<1%' : `${Math.round(share * 100)}%`;

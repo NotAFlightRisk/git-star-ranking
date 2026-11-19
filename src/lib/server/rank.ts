@@ -3,9 +3,16 @@ export interface Histogram {
   stars: number[];
   above: number[];
   total: number;
+  /** Counts under this many stars are estimated */
+  roughBelow?: number;
 }
 
-export function histogram(counts: { stars: number; n: number }[]): Histogram {
+type Count = { stars: number; n: number };
+
+/** Accounts with at least so many stars, as multiples of those at the cut and above, from 1 star up */
+export type Tail = [stars: number, times: number][];
+
+export function histogram(counts: Count[]): Histogram {
   const above: number[] = [];
   let total = 0;
   for (const { n } of counts) {
@@ -36,10 +43,37 @@ export const rankOf = ({ stars, above, total }: Histogram, count: number) =>
 /** How many sit at this count or above */
 export const atLeast = (histogram: Histogram, count: number) => rankOf(histogram, count - 1) - 1;
 
-/** The next count up from this one, and the rank it would bring */
-export function nextUp({ stars, above }: Histogram, count: number) {
+// straight between the points either side, on a log-log scale
+function along(points: Tail, stars: number) {
+  const i = points.findIndex(([at]) => at >= stars);
+  const [[s0, t0], [s1, t1]] = [points[Math.max(i - 1, 0)], points[i]];
+  return s1 === stars ? t1 : t0 * (t1 / t0) ** (Math.log(stars / s0) / Math.log(s1 / s0));
+}
+
+/** The tally with everything under `below` stars swapped for the tail, scaled to the count at `below` */
+export function withTail(counts: Count[], tail: Tail, below: number): Histogram {
+  const real = histogram(counts);
+  const edge = atLeast(real, below);
+  if (!edge) return real;
+  const points: Tail = [...tail.filter(([stars]) => stars < below), [below, 1]];
+  const curve = (stars: number) =>
+    Math.round(Math.max(edge * along(points, stars), atLeast(real, stars)));
+  const rows = Array.from({ length: below - 1 }, (_, i) => below - 1 - i)
+    .map((stars) => ({ stars, n: curve(stars) - curve(stars + 1) }))
+    .filter(({ n }) => n);
+  return {
+    ...histogram([...counts.filter(({ stars }) => stars >= below), ...rows]),
+    roughBelow: below
+  };
+}
+
+/** The next count up from this one, the rank it would bring and how many places that jumps */
+export function nextUp({ stars, above, total, roughBelow = 0 }: Histogram, count: number) {
   const at = place(stars, count);
-  return at ? { stars: stars[at - 1], rank: 1 + above[at - 1] } : undefined;
+  if (!at) return undefined;
+  const rank = 1 + above[at - 1];
+  const places = (above[at] ?? total) + 1 - rank;
+  return { stars: stars[at - 1], rank, places, rough: stars[at - 1] < roughBelow };
 }
 
 /** The fewest stars that still make the top share, so where "top 1%" starts */
@@ -70,9 +104,15 @@ export function bands(histogram: Histogram) {
     edges.push(...STEPS.map((step) => Math.round(step * scale)));
   }
   const between = (from: number, to: number) => atLeast(histogram, from) - atLeast(histogram, to);
+  const rough = (from: number) => from < (histogram.roughBelow ?? 0);
   return edges
     .slice(0, -1)
-    .map((from, i) => ({ from, to: edges[i + 1], count: between(from, edges[i + 1]) }))
+    .map((from, i) => ({
+      from,
+      to: edges[i + 1],
+      count: between(from, edges[i + 1]),
+      rough: rough(from)
+    }))
     .filter(({ from, to }) => to > least && from <= most);
 }
 

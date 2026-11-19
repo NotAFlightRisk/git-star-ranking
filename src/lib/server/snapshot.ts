@@ -1,8 +1,9 @@
 import { env } from 'cloudflare:workers';
 import { BOARD_SIZE, LANGUAGES, LANGUAGE_PAGES, PAGE_SIZE } from './config.ts';
-import { competition, histogram } from './rank.ts';
+import { competition, histogram, withTail } from './rank.ts';
 import { readState } from './db.ts';
 import { get, put, putAll } from './store.ts';
+import { ROUGH_BELOW, TAIL } from './tail.ts';
 import { meterD1 } from './usage.ts';
 
 export type Board = 'users' | 'organizations' | 'repositories';
@@ -49,7 +50,9 @@ async function publish(key: string, rows: { stars: number }[], size: number) {
 async function board(name: Board, top: D1PreparedStatement, counts: D1PreparedStatement) {
   const [rows, tally] = meterD1(await env.DB.batch([top, counts]));
   const ranked = rows.results as { id: number; stars: number }[];
-  const spread = histogram(tally.results as { stars: number; n: number }[]);
+  const scored = tally.results as { stars: number; n: number }[];
+  const spread =
+    name === 'repositories' ? histogram(scored) : withTail(scored, TAIL[name], ROUGH_BELOW);
   const date = new Date().toISOString().slice(0, 10);
   await put(`hist/${name}`, spread);
   await put(
@@ -57,7 +60,8 @@ async function board(name: Board, top: D1PreparedStatement, counts: D1PreparedSt
     ranked.map(({ id }) => id)
   );
   const size = PAGE_SIZE[name];
-  return { total: spread.total, pages: await publish(`board/${name}`, ranked, size), size };
+  const total = scored.reduce((sum, { n }) => sum + n, 0);
+  return { total, pages: await publish(`board/${name}`, ranked, size), size };
 }
 
 interface Tally {

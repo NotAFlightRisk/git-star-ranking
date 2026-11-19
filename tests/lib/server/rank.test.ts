@@ -9,7 +9,8 @@ import {
   nextUp,
   percentile,
   rankOf,
-  starsFor
+  starsFor,
+  withTail
 } from '../../../src/lib/server/rank.ts';
 
 const spread = histogram([
@@ -59,9 +60,9 @@ describe('atLeast', () => {
 
 describe('nextUp', () => {
   it('points at the next count up and the rank it brings', () => {
-    expect(nextUp(spread, 100)).toEqual({ stars: 500, rank: 2 });
-    expect(nextUp(spread, 600)).toEqual({ stars: 900, rank: 1 });
-    expect(nextUp(spread, 10)).toEqual({ stars: 100, rank: 4 });
+    expect(nextUp(spread, 100)).toEqual({ stars: 500, rank: 2, places: 2, rough: false });
+    expect(nextUp(spread, 600)).toEqual({ stars: 900, rank: 1, places: 1, rough: false });
+    expect(nextUp(spread, 10)).toEqual({ stars: 100, rank: 4, places: 3, rough: false });
   });
 
   it('has nowhere to go from the top', () => {
@@ -85,7 +86,7 @@ describe('bands', () => {
   it('counts every account once, in log steps from the least to the most', () => {
     const steps = bands(spread);
     expect(steps.map(({ from }) => from)).toEqual([100, 160, 250, 400, 630]);
-    expect(steps.at(-1)).toEqual({ from: 630, to: 1000, count: 1 });
+    expect(steps.at(-1)).toEqual({ from: 630, to: 1000, count: 1, rough: false });
     expect(steps.find(({ from }) => from === 400)?.count).toBe(2);
     expect(steps.reduce((sum, { count }) => sum + count, 0)).toBe(spread.total);
   });
@@ -137,5 +138,82 @@ describe('marks', () => {
       { share: 0.5, stars: 1 },
       { share: 0.01, stars: 1_000 }
     ]);
+  });
+});
+
+describe('withTail', () => {
+  const counts = [
+    { stars: 1_000, n: 10 },
+    { stars: 100, n: 90 },
+    { stars: 4, n: 3 }
+  ];
+  const tailed = withTail(counts, [[1, 100]], 100);
+
+  it('scales the tail to the count at the cut, keeping everything from there up', () => {
+    expect(tailed.total).toBe(10_000);
+    expect(tailed.roughBelow).toBe(100);
+    expect(atLeast(tailed, 100)).toBe(100);
+    expect(rankOf(tailed, 1_000)).toBe(1);
+  });
+
+  it('runs straight between the points on a log-log scale', () => {
+    expect(atLeast(tailed, 10)).toBe(1_000);
+    expect(rankOf(tailed, 9)).toBe(1_001);
+    const bent = withTail(
+      counts,
+      [
+        [1, 100],
+        [10, 20]
+      ],
+      100
+    );
+    expect(atLeast(bent, 10)).toBe(2_000);
+    expect(atLeast(bent, 5)).toBe(3_247);
+  });
+
+  it('ignores points at or past the cut', () => {
+    expect(
+      withTail(
+        counts,
+        [
+          [1, 100],
+          [100, 2],
+          [200, 1.5]
+        ],
+        100
+      )
+    ).toEqual(tailed);
+  });
+
+  it('never counts fewer than are already in the table', () => {
+    const crowded = withTail(
+      [
+        { stars: 100, n: 1 },
+        { stars: 50, n: 500 }
+      ],
+      [[1, 10]],
+      100
+    );
+    expect(atLeast(crowded, 50)).toBe(501);
+  });
+
+  it('marks the estimated bands and next ranks as rough', () => {
+    expect(
+      bands(tailed)
+        .map(({ from, rough }) => [from, rough])
+        .slice(9, 12)
+    ).toEqual([
+      [63, true],
+      [100, false],
+      [160, false]
+    ]);
+    expect(nextUp(tailed, 4)?.rough).toBe(true);
+    expect(nextUp(tailed, 99)?.rough).toBe(false);
+  });
+
+  it('leaves a board alone when there is nothing at the cut to scale from', () => {
+    expect(withTail([{ stars: 4, n: 3 }], [[1, 100]], 100)).toEqual(
+      histogram([{ stars: 4, n: 3 }])
+    );
   });
 });

@@ -34,7 +34,7 @@ export async function profile(owner: OwnerRow) {
     rank,
     next: ranked && nextUp(ranked, owner.stars),
     milestone: ranked && milestone(ranked, owner.stars),
-    spread: ranked && { bands: bands(ranked), marks: marks(ranked) },
+    spread: ranked && { bands: bands(ranked), marks: marks(ranked), roughBelow: ranked.roughBelow },
     neighbours: near,
     moved,
     repos: repos.map((repo) => ({ ...repo, rank: all && rankOf(all, repo.stars) })),

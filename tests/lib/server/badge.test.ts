@@ -5,9 +5,9 @@ import { draw, endpoint, type Facts } from '../../../src/lib/server/badge.ts';
 
 const ranked: Facts = {
   stars: 12_345,
-  rank: { rank: 1_234, top: 0.004, of: 300_000 },
+  rank: { rank: 1_234, top: 0.004, of: 300_000, rough: false, roughOf: false },
   language: 'TypeScript',
-  inLanguage: { rank: 12, top: 0.001, of: 9_000 }
+  inLanguage: { rank: 12, top: 0.001, of: 9_000, rough: false, roughOf: false }
 };
 const options = (query = '') => readBadge(new URLSearchParams(query), 'repo');
 const svg = (facts: Facts | undefined, query = '') => render(draw(facts, options(query)));
@@ -22,6 +22,14 @@ describe('draw', () => {
     expect(says('show=top')).toBe('git rank: top 0.4%');
     expect(says('show=stars')).toBe('stars: 12.3k');
     expect(says('show=language')).toBe('git rank: #12 in TypeScript');
+  });
+
+  it('rounds off an estimated rank and flags it', () => {
+    const rough = {
+      stars: 4,
+      rank: { rank: 2_835_607, top: 0.3, of: 9_750_000, rough: true, roughOf: true }
+    };
+    expect(draw(rough, options('')).message).toBe('~#2.8m');
   });
 
   it('greys out what it has no value for, whatever colour was asked', () => {

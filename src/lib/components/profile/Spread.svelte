@@ -1,11 +1,12 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import { avatar, count, number, short, top } from '#lib/format.ts';
+  import { avatar, count, place as ranked, short, top } from '#lib/format.ts';
 
   interface Band {
     from: number;
     to: number;
     count: number;
+    rough: boolean;
   }
 
   interface Props {
@@ -13,13 +14,14 @@
     avatarId: number;
     stars: number;
     noun: string;
-    rank: { rank: number; top: number; of: number };
+    rank: { rank: number; top: number; of: number; rough: boolean; roughOf: boolean };
     bands: Band[];
     marks: { share: number; stars: number }[];
+    roughBelow?: number;
     controls?: Snippet;
   }
 
-  const { name, avatarId, stars, noun, rank, bands, marks, controls }: Props = $props();
+  const { name, avatarId, stars, noun, rank, bands, marks, roughBelow, controls }: Props = $props();
   const most = $derived(Math.max(...bands.map(({ count }) => count)));
   const place = (value: number) =>
     Math.max(
@@ -29,6 +31,8 @@
   const mine = $derived(place(stars));
   let hovered = $state<number>();
   const shown = $derived(bands[hovered ?? mine]);
+  const among = (style?: 'long') =>
+    `${count(rank.of, noun, rank.roughOf, style)}${roughBelow ? ' with stars' : ''}`;
 
   // log heights, as a power law leaves everything past the first few bands at nothing
   const height = (count: number) =>
@@ -42,8 +46,8 @@
   };
 
   const summary = $derived(
-    `${count(rank.of, noun)} by stars, on a log scale. ` +
-      `${name} is #${number(rank.rank)}, in the ${top(rank.top)}.`
+    `${among('long')}, by star count on a log scale. ` +
+      `${name} is ${ranked(rank.rank, rank.rough, 'long')}, in the ${top(rank.top)}.`
   );
 
   const decades = $derived(
@@ -54,12 +58,12 @@
 <figure>
   <figcaption>
     <div class="head">
-      <h2>Among {count(rank.of, noun)}</h2>
+      <h2>Among {among()}</h2>
       {@render controls?.()}
     </div>
     <p>
       <strong>{short(shown.from)}–{short(shown.to)} stars:</strong>
-      {count(shown.count, noun)}{#if shown === bands[mine]}, including {name}{/if}
+      {count(shown.count, noun, shown.rough)}{#if shown === bands[mine]}, including {name}{/if}
     </p>
   </figcaption>
   <div class="plot" role="img" aria-label={summary}>
@@ -74,6 +78,7 @@
         <div
           class="column"
           class:mine={i === mine}
+          class:rough={band.rough}
           role="presentation"
           onpointerenter={() => (hovered = i)}
         >
@@ -96,7 +101,13 @@
       <span class:first={!i} style:left="{(i / bands.length) * 100}%">{short(from)}</span>
     {/each}
   </div>
-  <p class="scale">Stars along the bottom, and {noun}s in each band on a log scale</p>
+  <p class="scale">
+    Stars along the bottom, and {noun}s in each band on a log scale.
+    {#if roughBelow}
+      We can't find everyone under {short(roughBelow)} stars, so the hatched bands are estimated from
+      a random sample of GitHub accounts.
+    {/if}
+  </p>
 </figure>
 
 <style>
@@ -177,18 +188,28 @@
   }
 
   .bar {
+    --fill: color-mix(in oklab, var(--text-muted) 35%, var(--surface));
     width: 100%;
     border-radius: 3px 3px 0 0;
-    background: color-mix(in oklab, var(--text-muted) 35%, var(--surface));
+    background: var(--fill);
   }
 
   .column:hover .bar {
-    background: color-mix(in oklab, var(--text-muted) 65%, var(--surface));
+    --fill: color-mix(in oklab, var(--text-muted) 65%, var(--surface));
   }
 
   .mine .bar,
   .mine:hover .bar {
-    background: var(--accent);
+    --fill: var(--accent);
+  }
+
+  .rough .bar {
+    background: repeating-linear-gradient(
+      -45deg,
+      var(--fill) 0 calc(var(--space-1) / 2),
+      transparent 0 var(--space-1)
+    );
+    box-shadow: inset 0 0 0 1px var(--fill);
   }
 
   .pin {
