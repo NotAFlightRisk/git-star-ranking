@@ -11,13 +11,21 @@
   import Stats from '#lib/components/profile/Stats.svelte';
   import RankTable from '#lib/components/RankTable.svelte';
   import Seo from '#lib/components/Seo.svelte';
-  import { avatar, count, month, number } from '#lib/format.ts';
+  import { about, avatar, count, month, number, place } from '#lib/format.ts';
 
   const { data, form } = $props();
   const owner = $derived(data.owner);
   const noun = $derived(owner.kind ? 'organization' : 'user');
   const counted = $derived(owner.refreshed_at > 0);
   const side = $derived(counted || data.neighbours || data.self);
+  const description = $derived(
+    `${owner.login} has ${number(owner.stars)} stars on GitHub` +
+      (data.rank
+        ? `, ranked ${place(data.rank.rank, data.rank.rough, 'long')} of ` +
+          `${about(data.rank.of, data.rank.roughOf, 'long')} ${noun}s with stars`
+        : '') +
+      '. See their most starred repositories.'
+  );
   const schema = $derived({
     '@context': 'https://schema.org',
     '@type': 'ProfilePage',
@@ -31,13 +39,7 @@
   });
 </script>
 
-<Seo
-  title="{owner.login}'s GitHub stars and rank"
-  description="{owner.login} has {number(owner.stars)} stars on GitHub{data.rank
-    ? `, ranked #${number(data.rank.rank)} of ${number(data.rank.of)} ${noun}s`
-    : ''}. See their most starred repositories."
-  {schema}
-/>
+<Seo title="{owner.login}'s GitHub stars and rank" {description} {schema} />
 
 {#snippet title()}
   <h1>{owner.login}</h1>

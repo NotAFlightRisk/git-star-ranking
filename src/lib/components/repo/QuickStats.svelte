@@ -6,7 +6,7 @@
 
   interface Props {
     repo: { stars: number; created_at: number | null };
-    next?: { stars: number; rank: number };
+    next?: { stars: number; rank: number; places: number; rough: boolean };
     milestone?: { percent: number; stars: number };
     club?: { least: number; repos: number };
     yearly?: number;

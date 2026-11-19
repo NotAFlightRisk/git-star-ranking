@@ -9,7 +9,7 @@ import {
   type BadgeOptions,
   type Show
 } from '../badges.ts';
-import { number, short, top } from '../format.ts';
+import { number, place, short, top } from '../format.ts';
 import { logo, render, type Drawn } from './badge-svg.ts';
 import { languageListing, readMeta, standing } from './boards.ts';
 import { findOwner, findRepo, type RepoRow } from './db.ts';
@@ -51,7 +51,7 @@ async function repoFacts(login: string, name: string, show: Show): Promise<Facts
 }
 
 const VALUES: Record<Show, (facts: Facts) => string | undefined> = {
-  rank: ({ rank }) => rank && `#${number(rank.rank)}`,
+  rank: ({ rank }) => rank && place(rank.rank, rank.rough),
   language: ({ inLanguage, language }) =>
     inLanguage && `#${number(inLanguage.rank)} in ${language}`,
   top: ({ rank }) => rank && top(rank.top),

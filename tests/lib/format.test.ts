@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { boardPath, span, trend } from '../../src/lib/format.ts';
+import { about, boardPath, count, place, span, trend } from '../../src/lib/format.ts';
 
 describe('trend', () => {
   it('says which way an entry moved, and how far', () => {
@@ -38,5 +38,23 @@ describe('span', () => {
 
   it('treats time already passed as none', () => {
     expect(span(-5_000)).toBe('0 minutes');
+  });
+});
+
+describe('place and about', () => {
+  it('spell out exact ranks and counts in full', () => {
+    expect(place(2_835_607)).toBe('#2,835,607');
+    expect(about(328_817)).toBe('328,817');
+  });
+
+  it('round off estimates and flag them with a ~', () => {
+    expect(place(2_835_607, true)).toBe('~#2.8m');
+    expect(about(9_760_000, true)).toBe('~9.8m');
+    expect(about(900_570, true)).toBe('~900k');
+  });
+
+  it('spell estimates out in words for prose', () => {
+    expect(place(2_835_607, true, 'long')).toBe('about #2.8 million');
+    expect(count(9_760_000, 'user', true, 'long')).toBe('about 9.8 million users');
   });
 });

@@ -64,7 +64,9 @@ export async function spread(key: string) {
 export const position = (histogram: Histogram, stars: number) => ({
   rank: rankOf(histogram, stars),
   top: percentile(histogram, stars),
-  of: histogram.total
+  of: histogram.total,
+  rough: stars < (histogram.roughBelow ?? 0),
+  roughOf: !!histogram.roughBelow
 });
 
 /** Rank and percentile for a star count on a board, as of the last snapshot */

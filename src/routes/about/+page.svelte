@@ -25,6 +25,12 @@
       Users and organizations are ranked separately. The tables list the top 10,000 of each, 100 to
       a page, and every profile shows its rank and how near the top it sits, wherever that is.
     </p>
+    <p>
+      Under 250 stars there are millions of accounts and our search can't find them all, so ranks
+      down there are estimated from a random sample of about 140,000 GitHub accounts, and get a ~ to
+      show it. The "top X%" figures are out of everyone with at least one star. That's only 4% of
+      GitHub users, so even one star puts you in decent company.
+    </p>
   </section>
 
   <section aria-labelledby="freshness">

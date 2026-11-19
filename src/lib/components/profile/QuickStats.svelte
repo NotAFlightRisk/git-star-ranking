@@ -6,7 +6,7 @@
 
   interface Props {
     owner: { login: string; stars: number; repos: number };
-    next?: { stars: number; rank: number };
+    next?: { stars: number; rank: number; places: number; rough: boolean };
     milestone?: { percent: number; stars: number };
     repos: { name: string; stars: number; rank?: number }[];
     languages: { language: string | null; repos: number; stars: number }[];
