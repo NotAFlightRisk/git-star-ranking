@@ -11,7 +11,7 @@
   import Siblings from '#lib/components/repo/Siblings.svelte';
   import Seo from '#lib/components/Seo.svelte';
   import Toggle from '#lib/components/Toggle.svelte';
-  import { boardPath, count, month, number, percent, tidy, top, trend } from '#lib/format.ts';
+  import { count, month, number, percent, tidy, top, trend } from '#lib/format.ts';
 
   const { data } = $props();
   const { owner, repo, rank, spread, language, siblings } = $derived(data);
@@ -51,9 +51,7 @@
     {#if repo.archived}<span class="archived">Archived</span>{/if}
     {#if owner.name}<span>by <a href="/{owner.login}">{owner.name}</a></span>{/if}
     {#if repo.language}
-      <span>
-        <a href={boardPath('/repositories', 1, repo.language)}><Language name={repo.language} /></a>
-      </span>
+      <span><Language name={repo.language} link /></span>
     {/if}
     {#if repo.license}<span>{repo.license} licence</span>{/if}
     {#if repo.forks !== null}<span>{count(repo.forks, 'fork')}</span>{/if}

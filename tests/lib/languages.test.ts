@@ -1,6 +1,6 @@
 import * as icons from 'simple-icons';
 import { describe, expect, it } from 'vitest';
-import { drawn, icon } from '../../src/lib/languages.ts';
+import { drawn, icon, tone } from '../../src/lib/languages.ts';
 
 describe('language icons', () => {
   it('only maps to glyphs simple-icons still has', () => {
@@ -12,5 +12,18 @@ describe('language icons', () => {
     expect(icon('C++')).toBe('cplusplus');
     expect(icon('PowerShell')).toBeUndefined();
     expect(icon('constructor')).toBeUndefined();
+  });
+});
+
+describe('language colours', () => {
+  it("uses GitHub's own colour for a language it knows", () => {
+    expect(tone('TypeScript')).toBe('#3178c6');
+    expect(tone('PowerShell')).toBe('#012456');
+  });
+
+  it('greys out unknown languages, repos with none and Object builtins', () => {
+    expect(tone('Brainfuck')).toBe('var(--series-other)');
+    expect(tone(null)).toBe('var(--series-other)');
+    expect(tone('constructor')).toBe('var(--series-other)');
   });
 });

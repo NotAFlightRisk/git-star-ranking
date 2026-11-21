@@ -1,6 +1,13 @@
 <script lang="ts">
-  const { page, pages, href }: { page: number; pages: number; href: (page: number) => string } =
-    $props();
+  interface Props {
+    page: number;
+    pages: number;
+    // links when each page has its own url, buttons when it flips in place
+    href?: (page: number) => string;
+    go?: (page: number) => void;
+  }
+
+  const { page, pages, href, go }: Props = $props();
 
   // first, last and two either side, with gaps where pages are skipped
   const shown = $derived(
@@ -10,21 +17,36 @@
   );
 </script>
 
+{#snippet label(n: number, rel?: 'prev' | 'next')}
+  {#if rel}
+    {rel === 'prev' ? 'Previous' : 'Next'}
+  {:else}
+    <span class="visually-hidden">Page</span>
+    {n}
+  {/if}
+{/snippet}
+
+{#snippet to(n: number, rel?: 'prev' | 'next')}
+  {@const current = !rel && n === page ? 'page' : undefined}
+  {#if href}
+    <a href={href(n)} {rel} class:step={rel} aria-current={current}>{@render label(n, rel)}</a>
+  {:else}
+    <button type="button" class:step={rel} aria-current={current} onclick={() => go?.(n)}>
+      {@render label(n, rel)}
+    </button>
+  {/if}
+{/snippet}
+
 {#if pages > 1}
   <nav class="pager" aria-label="Pages">
-    {#if page > 1}<a class="step" href={href(page - 1)} rel="prev">Previous</a>{/if}
+    {#if page > 1}{@render to(page - 1, 'prev')}{/if}
     <ol>
       {#each shown as n, i (n)}
         {#if i > 0 && n - shown[i - 1] > 1}<li class="gap" aria-hidden="true">...</li>{/if}
-        <li>
-          <a href={href(n)} aria-current={n === page ? 'page' : undefined}>
-            <span class="visually-hidden">Page</span>
-            {n}
-          </a>
-        </li>
+        <li>{@render to(n)}</li>
       {/each}
     </ol>
-    {#if page < pages}<a class="step" href={href(page + 1)} rel="next">Next</a>{/if}
+    {#if page < pages}{@render to(page + 1, 'next')}{/if}
   </nav>
 {/if}
 
@@ -48,7 +70,8 @@
     list-style: none;
   }
 
-  a {
+  a,
+  button {
     display: block;
     min-width: 2.25rem;
     padding: var(--space-1) var(--space-2);
@@ -67,6 +90,13 @@
       background: var(--accent);
       border-color: var(--accent);
     }
+  }
+
+  button {
+    font: inherit;
+    color: var(--accent);
+    background: none;
+    cursor: pointer;
   }
 
   .gap {
