@@ -2,6 +2,7 @@
   import { page } from '$app/state';
   import type { ComponentProps } from 'svelte';
   import { BOARDS, boardPath, number } from '#lib/format.ts';
+  import { icon, swatch } from '#lib/languages.ts';
   import Language from './Language.svelte';
   import Pager from './Pager.svelte';
   import RankTable from './RankTable.svelte';
@@ -27,11 +28,14 @@
   );
   const href = (page: number) => boardPath(info.path, page, data.language);
   const repos = $derived(data.board === 'repositories');
+  const title = $derived(data.language ? `Top ${subject}` : info.label);
   const summary = $derived(
     data.language
-      ? `The top 500 ${data.language} repositories, ranked by stars`
+      ? `The 500 ${subject} on GitHub with the most stars`
       : `The top 10k GitHub ${subject}, ranked by ${repos ? 'stars' : 'total stars received'}`
   );
+  const paint = $derived(data.language ? swatch(data.language) : undefined);
+  const glyph = $derived(data.language && icon(data.language));
   const first = $derived((data.page - 1) * data.size + 1);
   // a hundred owners sit side by side as two fifties on a wide screen
   const COLUMN = 50;
@@ -53,22 +57,39 @@
 </script>
 
 <Seo
-  title="{data.language ? `${data.language} repositories` : `GitHub ${subject}`}{data.page > 1
-    ? `, page ${data.page}`
-    : ''}"
+  title="{data.language ? title : `GitHub ${subject}`}{data.page > 1 ? `, page ${data.page}` : ''}"
   description="GitHub {subject} ranked by stars, {first} to {first +
     data.rows.length -
     1}{data.total ? ` of ${number(data.total)} counted` : ''}. Updated every six hours."
   path={href(data.page)}
 />
 
-<header class="head">
-  <h1>{data.language ? `${data.language} repositories` : info.label}</h1>
+<header class="head" style:--tone={paint?.colour} style:--on-tone={paint?.ink}>
+  <h1>
+    {#if data.language}
+      <span class="tile">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          {#if glyph}
+            <use href="/languages.svg#{glyph}" />
+          {:else}
+            <circle cx="12" cy="12" r="5" />
+          {/if}
+        </svg>
+      </span>
+    {/if}
+    {title}
+  </h1>
   <p>{summary}</p>
 </header>
 
 {#if data.languages.length}
-  <nav class="languages" aria-label="Languages" {@attach centre}>
+  <nav
+    class="languages"
+    aria-label="Languages"
+    style:--tone={paint?.colour}
+    style:--on-tone={paint?.ink}
+    {@attach centre}
+  >
     <a href="/repositories" aria-current={data.language ? undefined : 'page'}>All</a>
     {#each data.languages as language (language.slug)}
       <a
@@ -105,8 +126,28 @@
     margin-block-end: var(--space-4);
 
     h1 {
+      display: flex;
+      gap: var(--space-3);
+      align-items: start;
       font-size: var(--text-2xl);
       letter-spacing: -0.02em;
+    }
+
+    .tile {
+      display: grid;
+      flex: none;
+      place-items: center;
+      width: 1.25em;
+      aspect-ratio: 1;
+      color: var(--on-tone, var(--on-accent));
+      background: var(--tone, var(--accent));
+      border-radius: var(--radius);
+
+      svg {
+        width: 0.75em;
+        height: 0.75em;
+        fill: currentColor;
+      }
     }
 
     p {
@@ -132,9 +173,9 @@
       }
 
       &[aria-current='page'] {
-        color: var(--on-accent);
-        background: var(--accent);
-        border-color: var(--accent);
+        color: var(--on-tone, var(--on-accent));
+        background: var(--tone, var(--accent));
+        border-color: var(--tone, var(--accent));
       }
     }
   }

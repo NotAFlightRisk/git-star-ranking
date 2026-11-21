@@ -91,3 +91,15 @@ export const drawn = new Set([...KNOWN.values()].flatMap(([, glyph]) => glyph ??
 /** A language's own colour, or grey for one we don't know */
 export const tone = (language: string | null) =>
   (language && KNOWN.get(language)?.[0]) || 'var(--series-other)';
+
+/** A language's colour with white on top if that still reads at 4.5:1, else black */
+export function swatch(language: string) {
+  const colour = KNOWN.get(language)?.[0];
+  if (!colour) return undefined;
+  const [red, green, blue] = [1, 3, 5].map((at) => {
+    const channel = parseInt(colour.slice(at, at + 2), 16) / 255;
+    return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  });
+  const luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+  return { colour, ink: 1.05 / (luminance + 0.05) >= 4.5 ? '#ffffff' : '#000000' };
+}
