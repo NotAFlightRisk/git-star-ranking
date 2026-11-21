@@ -6,7 +6,6 @@
   import Pager from './Pager.svelte';
   import RankTable from './RankTable.svelte';
   import Seo from './Seo.svelte';
-  import Updated from './Updated.svelte';
 
   interface Props {
     data: {
@@ -15,7 +14,6 @@
       pages: number;
       size: number;
       rows: ComponentProps<typeof RankTable>['rows'];
-      at?: number;
       total: number;
       language?: string;
       languages: { name: string; slug: string }[];
@@ -34,12 +32,6 @@
       ? `The top 500 ${data.language} repositories, ranked by stars`
       : `The top 10k GitHub ${subject}, ranked by ${repos ? 'stars' : 'total stars received'}`
   );
-  // the board total counts every repository, so a language board leaves it out
-  const updated = $derived.by(() => {
-    if (data.language || !data.total) return 'Last updated';
-    const noun = data.board === 'users' ? 'profiles' : subject;
-    return `${number(data.total)} scored ${noun}, last updated`;
-  });
   const first = $derived((data.page - 1) * data.size + 1);
   // a hundred owners sit side by side as two fifties on a wide screen
   const COLUMN = 50;
@@ -73,7 +65,6 @@
 <header class="head">
   <h1>{data.language ? `${data.language} repositories` : info.label}</h1>
   <p>{summary}</p>
-  <Updated at={data.at} label={updated} />
 </header>
 
 {#if data.languages.length}

@@ -1,14 +1,14 @@
 <script lang="ts">
   import { count, percent, short } from '#lib/format.ts';
+  import { tone } from '#lib/languages.ts';
   import Language from '../Language.svelte';
 
   interface Props {
     stars: number;
     languages: { language: string | null; repos: number; stars: number }[];
-    tone: (language: string | null) => string;
   }
 
-  const { stars, languages, tone }: Props = $props();
+  const { stars, languages }: Props = $props();
   const MOST = 8;
   const named = $derived(languages.filter((row) => row.language));
   const share = (part: number) => (stars ? part / stars : 0);
@@ -19,7 +19,7 @@
   <ol>
     {#each named.slice(0, MOST) as row (row.language)}
       <li style:--tone={tone(row.language)}>
-        <Language name={row.language!} />
+        <Language name={row.language!} link />
         <span class="figures">
           {short(row.stars)} stars, {percent(share(row.stars))}
           <span class="repos">· {count(row.repos, 'repo')}</span>

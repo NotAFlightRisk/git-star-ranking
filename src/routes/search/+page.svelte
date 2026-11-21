@@ -61,7 +61,7 @@
               <div class="name">
                 <a href="/{repo.login}/{repo.name}">{repo.login}/<wbr />{repo.name}</a>
                 {#if repo.language}
-                  <span class="kind"><Language name={repo.language} /></span>
+                  <span class="kind"><Language name={repo.language} link /></span>
                 {/if}
               </div>
               <span class="stars"><Star /> {number(repo.stars)}</span>

@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { tones } from '#lib/charts.ts';
   import Languages from './Languages.svelte';
   import RepoMap from './RepoMap.svelte';
   import Timeline from './Timeline.svelte';
@@ -17,23 +16,23 @@
   }
 
   const { owner, repos, languages }: Props = $props();
-  const tone = $derived(tones(languages));
   const dated = $derived(
     repos.flatMap((repo) => (repo.created_at ? [{ ...repo, created_at: repo.created_at }] : []))
   );
 </script>
 
 <div class="pair">
-  <RepoMap {owner} {repos} {languages} {tone} />
+  <RepoMap {owner} {repos} {languages} />
   {#if languages.some((row) => row.language)}
-    <Languages stars={owner.stars} {languages} {tone} />
+    <Languages stars={owner.stars} {languages} />
   {/if}
 </div>
-{#if dated.length > 1}<Timeline repos={dated} {tone} />{/if}
+{#if dated.length > 1}<Timeline repos={dated} />{/if}
 
 <style>
   .pair {
     display: grid;
+    align-items: start;
     gap: var(--space-6);
   }
 

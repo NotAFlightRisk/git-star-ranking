@@ -1,5 +1,6 @@
 <script lang="ts">
   import { count, number, percent, short } from '#lib/format.ts';
+  import { tone } from '#lib/languages.ts';
   import { squarify, type Tile } from '#lib/treemap.ts';
 
   interface Piece {
@@ -15,10 +16,9 @@
     owner: { login: string; stars: number };
     repos: { id: number; name: string; stars: number; language: string | null }[];
     languages: { repos: number; stars: number }[];
-    tone: (language: string | null) => string;
   }
 
-  const { owner, repos, languages, tone }: Props = $props();
+  const { owner, repos, languages }: Props = $props();
   const MOST = 24;
   // past this share a tile's too thin to read, so it joins the rest
   const LEAST = 0.004;

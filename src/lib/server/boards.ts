@@ -37,7 +37,7 @@ export async function boardLoad(board: Board, url: URL) {
   if (asked && !language) error(404, 'We only keep boards for the 30 biggest languages');
   const pages = language?.pages ?? latest?.boards[board].pages ?? 0;
   const page = pageNumber(url, pages);
-  const { at, rows } = await entries<OwnerEntry | RepoEntry>(
+  const { rows } = await entries<OwnerEntry | RepoEntry>(
     language ? `repositories/${language.slug}` : board,
     page
   );
@@ -47,7 +47,6 @@ export async function boardLoad(board: Board, url: URL) {
     pages,
     size: latest?.boards[board].size ?? PAGE_SIZE[board],
     rows,
-    at,
     total: latest?.boards[board].total ?? 0,
     language: language?.name,
     languages: board === 'repositories' ? (latest?.languages ?? []) : []

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { month, number, short } from '#lib/format.ts';
+  import { tone } from '#lib/languages.ts';
 
   interface Repo {
     id: number;
@@ -11,10 +12,9 @@
 
   interface Props {
     repos: Repo[];
-    tone: (language: string | null) => string;
   }
 
-  const { repos, tone }: Props = $props();
+  const { repos }: Props = $props();
   const NAMED = 3;
   const start = (year: number) => Date.UTC(year, 0, 1) / 1000;
   const year = (seconds: number) => new Date(seconds * 1000).getUTCFullYear();

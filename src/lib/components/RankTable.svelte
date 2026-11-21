@@ -77,7 +77,7 @@
         </td>
         {#if language}
           <td class="language">
-            {#if row.language}<Language name={row.language} />{/if}
+            {#if row.language}<Language name={row.language} link />{/if}
           </td>
         {/if}
         <td class="numeric"><Star /> {number(row.stars)}</td>

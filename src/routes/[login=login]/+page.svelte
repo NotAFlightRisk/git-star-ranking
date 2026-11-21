@@ -9,6 +9,7 @@
   import Schedule from '#lib/components/profile/Schedule.svelte';
   import Spread from '#lib/components/profile/Spread.svelte';
   import Stats from '#lib/components/profile/Stats.svelte';
+  import Pager from '#lib/components/Pager.svelte';
   import RankTable from '#lib/components/RankTable.svelte';
   import Seo from '#lib/components/Seo.svelte';
   import { about, avatar, count, month, number, place } from '#lib/format.ts';
@@ -18,6 +19,11 @@
   const noun = $derived(owner.kind ? 'organization' : 'user');
   const counted = $derived(owner.refreshed_at > 0);
   const side = $derived(counted || data.neighbours || data.self);
+  const PER_PAGE = 10;
+  // each profile opens on its first page of repos
+  let turned = $state({ id: 0, page: 1 });
+  const repoPage = $derived(turned.id === owner.id ? turned.page : 1);
+  const shelf = $derived(data.repos.slice((repoPage - 1) * PER_PAGE, repoPage * PER_PAGE));
   const description = $derived(
     `${owner.login} has ${number(owner.stars)} stars on GitHub` +
       (data.rank
@@ -89,10 +95,15 @@
     <h2 id="repos">Repositories with 50+ stars</h2>
     {#if data.repos.length}
       <RankTable
-        rows={data.repos.map((repo) => ({ ...repo, rank: repo.rank ?? 0, login: owner.login }))}
+        rows={shelf.map((repo) => ({ ...repo, rank: repo.rank ?? 0, login: owner.login }))}
         caption="{owner.login}'s repositories with their overall rank"
         heading="Repository"
         owned
+      />
+      <Pager
+        page={repoPage}
+        pages={Math.ceil(data.repos.length / PER_PAGE)}
+        go={(page) => (turned = { id: owner.id, page })}
       />
     {:else}
       <p class="note">None yet. Forks don't count, and smaller repos still add to the total.</p>
