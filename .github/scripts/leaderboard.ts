@@ -1,11 +1,12 @@
 import { readFile, writeFile } from 'node:fs/promises';
-import { avatar, short } from '../../src/lib/format.ts';
-import { LOGIN, REPO } from '../../src/lib/names.ts';
+import { avatar } from '../../src/lib/format.ts';
+import { LOGIN, REPO, pathOf } from '../../src/lib/names.ts';
 
 type Row = Record<string, unknown>;
 
 const TOP = 100;
-const MOST = 28;
+const LONG = 24;
+const CUT = 22;
 const START = '<!-- leaderboard-start -->';
 const END = '<!-- leaderboard-end -->';
 const README = new URL('../README.md', import.meta.url);
@@ -21,19 +22,26 @@ const isId = (n: unknown): n is number => Number.isSafeInteger(n) && (n as numbe
 const isStars = (n: unknown): n is number => Number.isSafeInteger(n) && (n as number) >= 0;
 const named = (text: unknown, pattern: RegExp): text is string =>
   typeof text === 'string' && pattern.test(text);
-const fit = (text: string) => (text.length > MOST ? `${text.slice(0, MOST - 1)}…` : text);
+const fit = (text: string) => (text.length > LONG ? `${text.slice(0, CUT)}…` : text);
+// a decimal only while it still says something, so 98.5k, 401k and 1.1m
+const compact = new Intl.NumberFormat('en-GB', {
+  notation: 'compact',
+  maximumFractionDigits: 1,
+  maximumSignificantDigits: 3,
+  roundingPriority: 'lessPrecision'
+});
 
-const cell = (id: number, label: string, href: string, stars: number) =>
-  `[<img src="${avatar(id, 32)}" width="16" alt="" /> ${fit(label)}](${href}) (${short(stars)} ⭐)`;
+const cell = (id: number, label: string, path: string, stars: number) =>
+  `[<img src="${avatar(id, 32)}" width="16" alt="" /> ${label}](${homepage}${path}) (${compact.format(stars)} ★)`;
 
 const owner = ({ id, login, stars }: Row) =>
   isId(id) && named(login, LOGIN) && isStars(stars)
-    ? cell(id, `@${login}`, `https://github.com/${login}`, stars)
+    ? cell(id, `@${fit(login)}`, pathOf({ login }), stars)
     : undefined;
 
 const repo = ({ owner_id, login, name, stars }: Row) =>
   isId(owner_id) && named(login, LOGIN) && named(name, REPO) && isStars(stars)
-    ? cell(owner_id, name, `https://github.com/${login}/${name}`, stars)
+    ? cell(owner_id, fit(name), pathOf({ login, repo: name }), stars)
     : undefined;
 
 /** Whatever's usable from one board, skipping rows too odd to show */
@@ -59,15 +67,16 @@ if (empty.length) throw new Error(`Nothing usable for ${empty.join(', ')}, so th
 const { users, organizations, repositories } = columns;
 const rows = Array.from(
   { length: Math.max(users.length, organizations.length, repositories.length) },
-  (_, i) => `| ${users[i] ?? ''} | ${organizations[i] ?? ''} | ${repositories[i] ?? ''} |`
+  (_, i) =>
+    `| ${i + 1} | ${users[i] ?? ''} | ${organizations[i] ?? ''} | ${repositories[i] ?? ''} |`
 );
 const more = (noun: string, path: string) =>
   `**[View full ${noun} leaderboard →](${homepage}/${path})**`;
 const table = [
-  '| Top Users | Top Orgs | Top Repos |',
-  '|---|---|---|',
+  '| Rank | Top Users | Top Orgs | Top Repos |',
+  '|---|---|---|---|',
   ...rows,
-  `| ${more('user', 'users')} | ${more('org', 'organizations')} | ${more('repo', 'repositories')} |`
+  `| | ${more('user', 'users')} | ${more('org', 'organizations')} | ${more('repo', 'repositories')} |`
 ].join('\n');
 
 const readme = await readFile(README, 'utf8');
