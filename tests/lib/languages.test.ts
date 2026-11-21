@@ -1,6 +1,6 @@
 import * as icons from 'simple-icons';
 import { describe, expect, it } from 'vitest';
-import { drawn, icon, tone } from '../../src/lib/languages.ts';
+import { drawn, icon, swatch, tone } from '../../src/lib/languages.ts';
 
 describe('language icons', () => {
   it('only maps to glyphs simple-icons still has', () => {
@@ -25,5 +25,17 @@ describe('language colours', () => {
     expect(tone('Brainfuck')).toBe('var(--series-other)');
     expect(tone(null)).toBe('var(--series-other)');
     expect(tone('constructor')).toBe('var(--series-other)');
+  });
+
+  it('writes white wherever it reads at 4.5:1, and black on the rest', () => {
+    expect(swatch('JavaScript')).toEqual({ colour: '#f1e05a', ink: '#000000' });
+    expect(swatch('Java')?.ink).toBe('#000000');
+    expect(swatch('TypeScript')?.ink).toBe('#ffffff');
+    expect(swatch('Lua')?.ink).toBe('#ffffff');
+  });
+
+  it('has no swatch for a language without a colour', () => {
+    expect(swatch('Brainfuck')).toBeUndefined();
+    expect(swatch('constructor')).toBeUndefined();
   });
 });

@@ -152,7 +152,7 @@
 
     a {
       font-weight: 600;
-      overflow-wrap: break-word;
+      overflow-wrap: anywhere;
       text-decoration: none;
 
       &:hover {
