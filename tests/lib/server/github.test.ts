@@ -1,5 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import { nodeId, short, viewer } from '../../../src/lib/server/github.ts';
+import {
+  nextPages,
+  nodeId,
+  ownerByLogin,
+  owners,
+  short,
+  viewer,
+  type Owner
+} from '../../../src/lib/server/github.ts';
 
 describe('nodeId', () => {
   // checked against GitHub's GraphQL API on 2026-11-04
@@ -114,6 +122,44 @@ describe('viewer', () => {
   ])('calls it a timeout when GitHub %s, so the crawl can split the batch', async (_, reply) => {
     vi.stubGlobal('fetch', reply);
     await expect(viewer('token')).rejects.toHaveProperty('timedOut', true);
+    vi.unstubAllGlobals();
+  });
+});
+
+describe('a repo GitHub sends back as null', () => {
+  const node = { databaseId: 9, name: 'cli', stargazerCount: 80, description: null };
+  const errors = [{ type: 'FORBIDDEN', path: ['nodes', 0, 'repositories', 'nodes', 0] }];
+  const owner = (login: string, nodes: unknown[]) => ({
+    __typename: 'User',
+    databaseId: login.length,
+    login,
+    repositories: { totalCount: 2, pageInfo: { hasNextPage: false }, nodes }
+  });
+  const answer = (data: object) =>
+    vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ data, errors })));
+
+  it('leaves that owner for later, without losing the rest of the batch', async () => {
+    answer({ nodes: [owner('octo', [null, node]), owner('hubot', [node])] });
+    const batch = [
+      { id: 4, kind: 0 as const },
+      { id: 5, kind: 0 as const }
+    ];
+    const [partial, fine] = await owners('token', batch);
+    expect(partial).toBeUndefined();
+    expect(fine?.list.map((repo) => repo.id)).toEqual([9]);
+    vi.unstubAllGlobals();
+  });
+
+  it('cuts the walk short rather than finishing it on a page with a gap', async () => {
+    answer({ o0: owner('octo', [null, node]) });
+    const [page] = await nextPages('token', [{ id: 4, kind: 0, cursor: 'x' } as Owner]);
+    expect(page).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  it('fails a lookup like any other bad answer instead of saving half the list', async () => {
+    answer({ repositoryOwner: owner('octo', [null, node]) });
+    await expect(ownerByLogin('token', 'octo')).rejects.toHaveProperty('status', 502);
     vi.unstubAllGlobals();
   });
 });

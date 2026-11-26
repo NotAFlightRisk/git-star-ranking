@@ -147,7 +147,7 @@ interface RawOwner {
   repositories: {
     totalCount: number;
     pageInfo: { hasNextPage: boolean; endCursor: string | null };
-    nodes: RawRepo[];
+    nodes: (RawRepo | null)[];
   };
 }
 
@@ -172,6 +172,11 @@ const toRepo = (raw: RawRepo): Repo => ({
   archived: raw.isArchived ?? null
 });
 
+const repos = (raw: RawOwner) => raw.repositories.nodes.filter((node) => node !== null).map(toRepo);
+
+// GitHub nulls a repo it couldn't load, and a list that's short of one mustn't prune it
+const partial = (raw: RawOwner) => raw.repositories.nodes.includes(null);
+
 const toOwner = (raw: RawOwner): Owner => ({
   id: raw.databaseId,
   login: raw.login,
@@ -180,11 +185,16 @@ const toOwner = (raw: RawOwner): Owner => ({
   name: raw.name?.trim() || null,
   followers: raw.followers?.totalCount ?? null,
   joined: epoch(raw.createdAt),
-  list: raw.repositories.nodes.map(toRepo),
+  list: repos(raw),
   cursor: raw.repositories.pageInfo.hasNextPage
     ? (raw.repositories.pageInfo.endCursor ?? undefined)
     : undefined
 });
+
+const whole = (raw: RawOwner) => {
+  if (partial(raw)) throw new GitHubError(502, 'a repo came back null');
+  return toOwner(raw);
+};
 
 async function graphql<T>(token: string, query: string, variables: object = {}) {
   const answer = (await call('graphql', `${API}/graphql`, {
@@ -207,7 +217,7 @@ export async function owners(token: string, batch: { id: number; kind: Kind }[])
     { ids: batch.map(({ id, kind }) => nodeId(kind, id)) }
   );
   return data.nodes.map((raw, i) => {
-    if (raw?.repositories) return toOwner(raw);
+    if (raw?.repositories) return partial(raw) ? undefined : toOwner(raw);
     return missing.has(String(i)) ? null : undefined;
   });
 }
@@ -220,12 +230,15 @@ export async function nextPages(token: string, batch: Owner[]) {
     )
     .join('\n');
   const { data } = await graphql<Record<string, RawOwner | null>>(token, `query { ${query} }`);
-  return batch.map((_, i) => (data[`o${i}`]?.repositories ? data[`o${i}`] : null));
+  return batch.map((_, i) => {
+    const raw = data[`o${i}`];
+    return raw?.repositories && !partial(raw) ? raw : null;
+  });
 }
 
 export const merge = (owner: Owner, raw: RawOwner): Owner => ({
   ...owner,
-  list: [...owner.list, ...raw.repositories.nodes.map(toRepo)],
+  list: [...owner.list, ...repos(raw)],
   cursor: toOwner(raw).cursor
 });
 
@@ -235,7 +248,7 @@ export async function ownerByLogin(token: string, login: string) {
     `query($login: String!) { repositoryOwner(login: $login) { ${fields()} } }`,
     { login }
   );
-  return data.repositoryOwner?.repositories ? toOwner(data.repositoryOwner) : null;
+  return data.repositoryOwner?.repositories ? whole(data.repositoryOwner) : null;
 }
 
 export async function viewer(token: string) {
@@ -243,7 +256,7 @@ export async function viewer(token: string) {
     token,
     `query { viewer { __typename ${PERSON} login ${repositories(null)} } }`
   );
-  return toOwner(data.viewer);
+  return whole(data.viewer);
 }
 
 interface RawFound {
