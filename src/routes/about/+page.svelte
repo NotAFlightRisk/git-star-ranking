@@ -74,9 +74,9 @@
       This is a rebuild of
       <a href="https://github.com/k0kubun/gitstar-ranking">gitstar-ranking</a>, which ran for years
       until it shut down in November 2026. Same idea and layout, new code. It's open source too, at
-      <a href="https://github.com/NotAFlightRisk/git-star-ranking"
-        >NotAFlightRisk/git-star-ranking</a
-      >.
+      <a href="https://github.com/NotAFlightRisk/git-star-ranking">
+        NotAFlightRisk/git-star-ranking
+      </a>.
     </p>
   </section>
 </article>

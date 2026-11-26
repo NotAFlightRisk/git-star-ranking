@@ -17,8 +17,9 @@
   {#if lost && page.params.login && !page.data.user}
     <p>
       If that's a real GitHub account we haven't reached yet,
-      <a href="/login?next={encodeURIComponent(page.url.pathname)}" data-sveltekit-reload>sign in</a
-      >
+      <a href="/login?next={encodeURIComponent(page.url.pathname)}" data-sveltekit-reload>
+        sign in
+      </a>
       and we'll add it.
     </p>
   {/if}
