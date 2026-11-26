@@ -33,6 +33,7 @@ export default defineConfig({
             'self',
             'data:',
             'https://avatars.githubusercontent.com',
+            'https://portfolio.peng.ly',
             'https://img.shields.io'
           ],
           'style-src': ['self', 'unsafe-inline'],
