@@ -5,30 +5,31 @@
   const reporting = Boolean(import.meta.env.PUBLIC_SENTRY_DSN);
 
   const avatar = (owner: string) => `https://avatars.githubusercontent.com/${owner}?s=64`;
+  const logo = (slug: string) => `https://portfolio.peng.ly/logos/${slug}.svg`;
   const related = [
     {
       name: 'Exit Format',
       about: 'how to take your data with you when you leave an app',
       url: 'https://exitformat.peng.ly',
-      logo: '/apps/exitformat.svg'
+      logo: logo('exitformat')
     },
     {
       name: 'fineprint',
       about: 'a VPN comparison with no affiliate links and a source for every claim',
       url: 'https://fineprint.peng.ly',
-      logo: '/apps/fineprint.svg'
+      logo: logo('fineprint')
     },
     {
       name: 'Android ROM Compat',
       about: 'which custom ROMs run on your Android phone, and how well',
       url: 'https://android-rom-compat.peng.ly',
-      logo: '/apps/android-rom-compat.svg'
+      logo: logo('android-rom-compat')
     },
     {
       name: 'The Enshittification Index',
       about: 'a dated, sourced record of big tech making things worse',
       url: 'https://enshittification.peng.ly',
-      logo: '/apps/enshittification.svg'
+      logo: logo('enshittification')
     },
     {
       name: 'gitranks',
