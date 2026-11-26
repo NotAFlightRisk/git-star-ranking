@@ -3,6 +3,46 @@
 
   const counting = Boolean(import.meta.env.PUBLIC_PLAUSIBLE_SCRIPT);
   const reporting = Boolean(import.meta.env.PUBLIC_SENTRY_DSN);
+
+  const avatar = (owner: string) => `https://avatars.githubusercontent.com/${owner}?s=64`;
+  const related = [
+    {
+      name: 'Exit Format',
+      about: 'how to take your data with you when you leave an app',
+      url: 'https://exitformat.peng.ly',
+      logo: '/apps/exitformat.svg'
+    },
+    {
+      name: 'fineprint',
+      about: 'a VPN comparison with no affiliate links and a source for every claim',
+      url: 'https://fineprint.peng.ly',
+      logo: '/apps/fineprint.svg'
+    },
+    {
+      name: 'Android ROM Compat',
+      about: 'which custom ROMs run on your Android phone, and how well',
+      url: 'https://android-rom-compat.peng.ly',
+      logo: '/apps/android-rom-compat.svg'
+    },
+    {
+      name: 'The Enshittification Index',
+      about: 'a dated, sourced record of big tech making things worse',
+      url: 'https://enshittification.peng.ly',
+      logo: '/apps/enshittification.svg'
+    },
+    {
+      name: 'gitranks',
+      about: 'GitHub rankings, analytics and README badges',
+      url: 'https://github.com/gitranks/gitranks-ui',
+      logo: avatar('gitranks')
+    },
+    {
+      name: 'github-dashboards',
+      about: 'stats, charts and history for any GitHub user, org or repo',
+      url: 'https://github.com/lissy93/github-dashboards',
+      logo: avatar('lissy93')
+    }
+  ];
 </script>
 
 <Seo
@@ -79,6 +119,18 @@
       </a>.
     </p>
   </section>
+
+  <section aria-labelledby="related">
+    <h2 id="related">You might also like</h2>
+    <ul class="related">
+      {#each related as app (app.url)}
+        <li>
+          <img src={app.logo} alt="" width="20" height="20" loading="lazy" />
+          <span><a href={app.url}>{app.name}</a> - {app.about}</span>
+        </li>
+      {/each}
+    </ul>
+  </section>
 </article>
 
 <style>
@@ -99,6 +151,23 @@
 
     h2 {
       font-size: var(--text-xl);
+    }
+  }
+
+  .related {
+    display: grid;
+    gap: var(--space-2);
+    padding: 0;
+    list-style: none;
+
+    li {
+      display: flex;
+      gap: var(--space-2);
+    }
+
+    img {
+      flex: none;
+      height: 1lh;
     }
   }
 </style>
