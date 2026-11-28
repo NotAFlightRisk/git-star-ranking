@@ -17,7 +17,7 @@
 
   const { image, preview, alt, target }: Props = $props();
   const link = $derived(target && `${page.url.origin}${pathOf(target)}`);
-  const small = $derived(target?.repo ? ' (repos need 50+ stars)' : '');
+  const small = $derived(target?.repo ? ` (repos need ${page.data.minStars}+ stars)` : '');
 
   const formats = Object.entries(FORMATS).map(([value, { label }]) => ({
     value: value as Format,

@@ -69,7 +69,7 @@
           {/each}
         </ul>
       {:else}
-        <p class="empty">No repos with 50+ stars start with that.</p>
+        <p class="empty">No repos with {data.minStars}+ stars start with that.</p>
       {/if}
     </section>
   </div>

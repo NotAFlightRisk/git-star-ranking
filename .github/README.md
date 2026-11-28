@@ -175,13 +175,13 @@ It's one Cloudflare Worker: a SvelteKit site, plus a cron, a queue consumer and 
 
 <details>
 
-- Discovery is a search sweep, about weekly. Search only ever returns 1,000 results, so the sweep splits `stars:50..10000000` in half (geometrically, as stars follow a power law) until each slice is under 1,000, then splits single star counts by creation date, down to the second if it has to. Each slice is one queue message, ticked off in a `slices` table so a retried message can't count twice, and a sweep that goes quiet for an hour gets its missing slices sent round again. A full sweep of the ~850k repos with 50+ stars is around 3,500 messages, so well under 3% of the queue allowance a month.
+- Discovery is a search sweep, about weekly. Search only ever returns 1,000 results, so the sweep splits `stars:25..10000000` in half (geometrically, as stars follow a power law) until each slice is under 1,000, then splits single star counts by creation date, down to the second if it has to. Each slice is one queue message, ticked off in a `slices` table so a retried message can't count twice, and a sweep that goes quiet for an hour gets its missing slices sent round again. A full sweep of the ~1.5M repos with 25+ stars is around 4,500 messages, so about 6% of the queue allowance a month.
 - Counting is batched GraphQL. Node ids are worked out from GitHub's numeric ids, so one `nodes(ids:)` query covers a whole batch for a point. GitHub's 10 second timeout bites long before the points do (it manages about 100 repos a second), so batches are packed to about 400 repos and halved if one times out.
 - Refreshes are tiered: 1,000+ stars daily, 100+ weekly, the rest monthly, plus anyone whose page gets visited when they're over a day old. A cron every ten minutes works through whoever's due for eight minutes.
 - A single Durable Object is the token pool. It mints the app's installation token, hands out calls in batches of ten so it's one request per batch rather than per call, and holds back for the primary limit, the per-minute limits (2,000 GraphQL and 900 REST points, 30 searches), `retry-after`, `x-ratelimit-reset` and 100 concurrent leases. Crawls leave 500 points an hour for sign-ins and visitors.
 - Rows are thin and keyed on GitHub's numeric ids, with no index on stars, since one full scan a snapshot is far cheaper than an index write on every star change. Repo rows are only written when something changed, and an owner gets one write per refresh for its schedule. A count that gets cut short (the pool says wait, or a page errors) isn't saved at all, so nobody's total drops for a month because of a blip.
 - Leaderboards and rank histograms are snapshots, rebuilt every six hours (hourly while the first sweep is still filling up). A rank is worked out from the histogram, never stored per row. A day of history is kept with each one.
-- The sweep only sees accounts with a 50+ star repo, so under 250 stars the users and organizations histograms swap in a curve instead. It's fitted to a random sample of 200,000 GitHub account IDs and scaled to our own count at 250+, and ranks down there show with a ~.
+- The sweep only sees accounts with a 25+ star repo, so under 250 stars the users and organizations histograms swap in a curve instead. It's fitted to a random sample of 200,000 GitHub account IDs and scaled to our own count at 250+, and ranks down there show with a ~.
 - Pages are rendered on the Worker and cached per data centre for ten minutes, then served stale while they refresh.
 - `/admin` shows this month's usage against each allowance, and `/api/budget` answers 503 once anything passes 70%, which is what the uptime check watches.
 
@@ -226,7 +226,7 @@ Settings, in `vars` in `wrangler.jsonc`:
 
 | Name               | Default             | What it does                                              |
 | ------------------ | ------------------- | --------------------------------------------------------- |
-| `REPO_MIN_STARS`   | `50`                | The smallest repo the sweep looks for and the tables keep |
+| `REPO_MIN_STARS`   | `25`                | The smallest repo the sweep looks for and the tables keep |
 | `REFRESH_TIERS`    | `1000:1,100:7,0:30` | Stars to refresh interval in days                         |
 | `SWEEP_DAYS`       | `7`                 | How often the search sweep goes round again               |
 | `OWNER_REPO_PAGES` | `10`                | Pages of 100 repos counted per account                    |

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { page } from '$app/state';
   import { count, number, percent, short } from '#lib/format.ts';
   import { tone } from '#lib/languages.ts';
   import { squarify, type Tile } from '#lib/treemap.ts';
@@ -37,8 +38,16 @@
       detail: repo.language ?? 'No language'
     }));
     const rest = [
-      { label: `${count(others, 'more repo')}`, stars: tracked - listed, detail: '50+ stars each' },
-      { label: 'Smaller repos', stars: owner.stars - tracked, detail: 'under 50 stars each' }
+      {
+        label: `${count(others, 'more repo')}`,
+        stars: tracked - listed,
+        detail: `${page.data.minStars}+ stars each`
+      },
+      {
+        label: 'Smaller repos',
+        stars: owner.stars - tracked,
+        detail: `under ${page.data.minStars} stars each`
+      }
     ];
     for (const piece of rest) {
       if (piece.stars > 0) list.push({ ...piece, key: piece.label, tone: '' });

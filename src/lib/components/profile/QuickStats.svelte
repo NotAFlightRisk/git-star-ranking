@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { page } from '$app/state';
   import { number, percent, short } from '#lib/format.ts';
   import Climb from './Climb.svelte';
   import Fact from './Fact.svelte';
@@ -25,7 +26,7 @@
 <Facts>
   <Climb stars={owner.stars} {next} {milestone} />
   <Fact label="Public repos">
-    <strong>{number(owner.repos)}</strong>, {number(tracked)} with 50+ stars
+    <strong>{number(owner.repos)}</strong>, {number(tracked)} with {page.data.minStars}+ stars
   </Fact>
   {#if popular.length}
     <Fact label="Popular repos">
@@ -44,7 +45,7 @@
   {/if}
   {#if smaller}
     <Fact label="Smaller repos">
-      <strong>{number(smaller)}</strong> stars from repos under 50
+      <strong>{number(smaller)}</strong> stars from repos under {page.data.minStars}
     </Fact>
   {/if}
 </Facts>

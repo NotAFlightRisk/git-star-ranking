@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { page } from '$app/state';
   import { month, number, short } from '#lib/format.ts';
   import { tone } from '#lib/languages.ts';
 
@@ -48,7 +49,7 @@
         <strong>{hovered.name}:</strong>
         {number(hovered.stars)} stars, made {month(hovered.created_at * 1000)}
       {:else}
-        {number(repos.length)} repos with 50+ stars, made
+        {number(repos.length)} repos with {page.data.minStars}+ stars, made
         {first === last ? `in ${first}` : `between ${first} and ${last}`}
       {/if}
     </p>

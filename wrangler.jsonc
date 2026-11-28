@@ -34,7 +34,7 @@
   "vars": {
     "APP_URL": "https://git-star-ranking.com",
     "ADMINS": "NotAFlightRisk",
-    "REPO_MIN_STARS": "50",
+    "REPO_MIN_STARS": "25",
     "REFRESH_TIERS": "1000:1,100:7,0:30",
     "SWEEP_DAYS": "7",
     "OWNER_REPO_PAGES": "10",
