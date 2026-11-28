@@ -29,6 +29,8 @@ User-agent: DotBot
 User-agent: serpstatbot
 User-agent: DataForSeoBot
 User-agent: BLEXBot
+User-agent: ElevenlabsCrawler
+User-agent: SERankingBacklinksBot
 Disallow: /
 
 Sitemap: https://git-star-ranking.com/sitemap.xml
