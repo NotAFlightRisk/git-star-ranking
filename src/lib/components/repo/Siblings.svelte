@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { page } from '$app/state';
   import { count, number } from '#lib/format.ts';
   import Star from '../Star.svelte';
 
@@ -17,7 +18,7 @@
 
 <section aria-labelledby="siblings">
   <h2 id="siblings">More from {login}</h2>
-  <p>{name} is their {where} of {count(of, 'repo')} with 50+ stars</p>
+  <p>{name} is their {where} of {count(of, 'repo')} with {page.data.minStars}+ stars</p>
   <ol>
     {#each rows as row (row.id)}
       <li style:--share={row.stars / most}>

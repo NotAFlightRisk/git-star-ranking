@@ -1,6 +1,7 @@
 <script lang="ts">
   import Seo from '#lib/components/Seo.svelte';
 
+  const { data } = $props();
   const counting = Boolean(import.meta.env.PUBLIC_PLAUSIBLE_SCRIPT);
   const reporting = Boolean(import.meta.env.PUBLIC_SENTRY_DSN);
 
@@ -77,10 +78,10 @@
   <section aria-labelledby="freshness">
     <h2 id="freshness">How fresh it is</h2>
     <p>
-      We find accounts through GitHub's search, by looking for every repo with 50 or more stars,
-      about once a week. Accounts with 1,000+ stars are recounted daily, 100+ weekly and the rest
-      monthly. The rankings themselves are rebuilt every six hours, and each page says when its
-      numbers were last updated.
+      We find accounts through GitHub's search, by looking for every repo with {data.minStars} or more
+      stars, about once a week. Accounts with 1,000+ stars are recounted daily, 100+ weekly and the rest
+      monthly. The rankings themselves are rebuilt every six hours, and each page says when its numbers
+      were last updated.
     </p>
     <p>
       Not here yet? Sign in and visit your own page, and you're counted on the spot. Opening any

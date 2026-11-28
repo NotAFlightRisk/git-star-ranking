@@ -92,7 +92,7 @@
   <Stats {owner} rank={data.rank} moved={data.moved} />
 
   <section aria-labelledby="repos">
-    <h2 id="repos">Repositories with 50+ stars</h2>
+    <h2 id="repos">Repositories with {data.minStars}+ stars</h2>
     {#if data.repos.length}
       <RankTable
         rows={shelf.map((repo) => ({ ...repo, rank: repo.rank ?? 0, login: owner.login }))}
